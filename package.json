@@ -13,19 +13,21 @@
     "articles",
     "static"
   ],
-  "version": "1.0.3",
-  "main": "./dist/relatinator.cjs",
+  "version": "1.0.4",
+  "main": "./dist/relatinator.mjs",
   "module": "./dist/relatinator.mjs",
   "exports": {
     ".": {
       "require": "./dist/relatinator.cjs",
-      "import": "./dist/relatinator.mjs"
+      "import": "./dist/relatinator.mjs",
+      "types": "./dist/relatinator.d.ts"
     }
   },
   "types": "./dist/relatinator.d.ts",
   "scripts": {
     "dev": "vite --host",
     "build": "rimraf dist && tsc && vite build && dts-bundle-generator --config ./dts-bundle-generator.config.ts",
+    "build-tsup": "tsup ./src/index.ts",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint:scripts": "eslint . --ext .ts",
@@ -64,6 +66,9 @@
     "vitest": "^0.34.1"
   },
   "dependencies": {
+    "natural": "^6.9.2"
+  },
+  "peerDependencies": {
     "natural": "^6.9.2"
   }
 }

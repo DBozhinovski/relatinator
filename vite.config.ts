@@ -32,6 +32,9 @@ module.exports = defineConfig({
       formats,
       fileName: (format) => fileName[format],
     },
+    rollupOptions: {
+      external: ["natural"],
+    }
   },
   test: {
 
