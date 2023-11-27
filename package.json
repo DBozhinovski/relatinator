@@ -13,7 +13,7 @@
     "articles",
     "static"
   ],
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "./dist/relatinator.mjs",
   "module": "./dist/relatinator.mjs",
   "exports": {
