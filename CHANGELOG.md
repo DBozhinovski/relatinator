@@ -2,6 +2,6 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
-## [1.0.0] - 2023-11-27
+## [1.0.2] - 2023-11-27
 
-- Publish version 1.0.0
+- Publish version 1.0.2

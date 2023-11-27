@@ -1,6 +1,5 @@
-import natural from "natural";
+import { TfIdf } from "natural";
 
-const { TfIdf } = natural;
 export const tfIdf = new TfIdf();
 
 interface Document {
