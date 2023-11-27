@@ -11,16 +11,16 @@ A humble library for finding related posts and content. Uses tf-idf under the ho
 
 ## Motivation
 
-My ["corner of the internet"](https://darko.io) was lacking a related posts section, and as usual, my first reflex was to try to find something off-the-shelf. After a couple of tries, I realized there was nothing suitable for this particular use case - a static-site for which the related post classification has to happen at build time.
+My ["corner of the internet"](https://darko.io) was lacking a related posts section, and as usual, my first reflex was to try to find something off the shelf. After a couple of tries, I realized nothing was suitable for this particular use case - a static site for which the related post classification must happen at build time.
 
-One approach would be to use a third-party service (plenty of those out there), but I'll admit I'm a bit allergic to external dependencies for relatively simple problem spaces (I mean c'mon, it's a blog, not a rocket ship). So, I decided to build my own.
+One approach would be to use a third-party service (plenty of those out there), but I'm a bit allergic to external dependencies for relatively simple problem spaces (I mean, c'mon, it's a blog, not a rocket ship). So, I decided to build my own.
 
 Full post describing the process here: https://darko.io/posts/build-you-a-related-post-classifier
 
 ## Features
 
 - Train a tf-idf classifier with your content
-- Get N related posts for a given post as input
+- Get N-related posts for a given post as input
 
 ## Usage
 
@@ -35,7 +35,7 @@ npm i relatinator
 Before you can get related posts, you need to train the TF-IDF with your content. To that end, the library exposes a `train` function that takes an array of documents as input. A document is defined as an object with an `id` and `content` property:
 
 - `id` - a unique identifier for the document
-- `content` - the contents of the document; These are expected to be a string. You can, however, concatenate any metadata, descriptions or anything else you might want to use for matching.
+- `content` - the document's contents; These are expected to be a string. You can concatenate any metadata, descriptions, or anything else you might want to use for matching.
 
 ```ts
 import { train } from "relatinator";
@@ -97,6 +97,6 @@ const related = getRelated("This is the first document", "1", 2);
 
 ## Acknowledgment
 
-If you found it useful somehow, I would be grateful if you could leave a star in the project's GitHub repository.
+If you found it useful, I would be grateful if you could leave a star in the project's GitHub repository.
 
 Thank you.
