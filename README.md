@@ -94,6 +94,7 @@ const related = getRelated("This is the first document", "1", 2);
 
 - [x] Reduce bundle size (natural isn't too tree-shakeable) - externalized it and made it a peer dep.
 - [ ] Add practical examples
+- [ ] Add support for extracting top N keywords from a document (possible utility with automated tagging and linking)
 
 ## Acknowledgment
 
