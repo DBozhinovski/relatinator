@@ -1,5 +1,7 @@
 # Relatinator
 
+![logo](https://raw.githubusercontent.com/DBozhinovski/relatinator/master/logo.svg)
+
 A humble library for finding related posts and content. Uses tf-idf under the hood. Primarily aimed at static site generators.
 
 - Based on [vite-vanilla-ts-lib-starter](https://github.com/kbysiec/vite-vanilla-ts-lib-starter/tree/master).
@@ -34,20 +36,20 @@ Before you can get related posts, you need to train the TF-IDF with your content
 - `content` - the contents of the document; These are expected to be a string. You can, however, concatenate any metadata, descriptions or anything else you might want to use for matching.
 
 ```ts
-import { train } from 'relatinator';
+import { train } from "relatinator";
 
 const documents = [
   {
-    id: '1',
-    content: 'This is the first document',
+    id: "1",
+    content: "This is the first document",
   },
   {
-    id: '2',
-    content: 'This is the second document',
+    id: "2",
+    content: "This is the second document",
   },
   {
-    id: '3',
-    content: 'This is the third document',
+    id: "3",
+    content: "This is the third document",
   },
 ];
 
@@ -63,28 +65,27 @@ Once you've trained the classifier, you can get related posts for a given post b
 - `topN` - the number of related posts you want to get
 
 ```ts
-
-import { train, getRelated } from 'relatinator';
+import { train, getRelated } from "relatinator";
 
 const documents = [
   {
-    id: '1',
-    content: 'This is the first document',
+    id: "1",
+    content: "This is the first document",
   },
   {
-    id: '2',
-    content: 'This is the second document',
+    id: "2",
+    content: "This is the second document",
   },
   {
-    id: '3',
-    content: 'This is the third document',
+    id: "3",
+    content: "This is the third document",
   },
 ];
 
 train(documents);
 
 // Get the top 2 related posts for something
-const related = getRelated('This is the first document', '1', 2);
+const related = getRelated("This is the first document", "1", 2);
 ```
 
 ## Roadmap
