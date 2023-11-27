@@ -1,6 +1,8 @@
 # Relatinator
 
-![logo](https://raw.githubusercontent.com/DBozhinovski/relatinator/master/logo.svg)
+<p align="center">
+  <img src="[http://some_place.com/image.png](https://raw.githubusercontent.com/DBozhinovski/relatinator/master/logo.svg)" />
+</p>
 
 A humble library for finding related posts and content. Uses tf-idf under the hood. Primarily aimed at static site generators.
 
