@@ -92,7 +92,7 @@ const related = getRelated("This is the first document", "1", 2);
 
 ## Roadmap
 
-- [ ] Reduce bundle size (natural isn't too tree-shakeable)
+- [x] Reduce bundle size (natural isn't too tree-shakeable) - externalized it and made it a peer dep.
 - [ ] Add practical examples
 
 ## Acknowledgment
