@@ -1,6 +1,10 @@
 {
   "name": "relatinator",
-  "description": "A simple library to find related posts and content. Aimed at static site generators.",
+  "description": "A humble library for finding related posts and content. Uses tf-idf under the hood. Primarily aimed at static site generators.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DBozhinovski/relatinator"
+  },
   "keywords": [
     "relatinator",
     "related",
@@ -9,7 +13,7 @@
     "articles",
     "static"
   ],
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "./dist/relatinator.cjs",
   "module": "./dist/relatinator.mjs",
   "exports": {
