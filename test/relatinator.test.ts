@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { tfIdf, train, findRelated } from "../src";
+import {
+  tfIdf,
+  train,
+  findRelated,
+  getTopTermsForId,
+  getTopRelatedDocumentsForTerm,
+} from "../src";
 import { TfIdfDocument } from "natural";
 import fs from "node:fs";
 import path from "node:path";
@@ -71,9 +77,10 @@ describe("relatinator, complex", () => {
     });
 
     train(documents);
+
     const docLength = (tfIdf.documents as unknown as TfIdfDocument[]).length;
 
-    expect(docLength).toBe(8);
+    expect(docLength).toBe(9);
   });
 
   it("should find related documents", () => {
@@ -93,10 +100,46 @@ describe("relatinator, complex", () => {
       3
     );
 
+    tfIdf.listTerms(4).forEach((item) => {
+      console.log(item.term + ": " + item.tfidf);
+    });
+
     expect(related).toEqual([
       "Example Markdown Document",
-      "Markdown Demonstration Article",
       "Sample Markdown Post",
+      "Insights into Markdown Usage",
+    ]);
+  });
+});
+
+describe("relatinator, terms", () => {
+  it("should return top terms for a document", () => {
+    const terms = getTopTermsForId(
+      "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
+    );
+
+    expect(terms.map((t) => t.term)).toEqual([
+      "book",
+      "cover",
+      "world",
+      "us",
+      "life",
+    ]);
+  });
+
+  it("should throw when trying to match a non-existent id", () => {
+    expect(() => getTopTermsForId("asdf")).toThrow();
+  });
+
+  it("should return top related documents for a term", () => {
+    const related = getTopRelatedDocumentsForTerm("book");
+
+    expect(related).toEqual([
+      "12 New Science Books To End the Year With Wonder About Ourselves and Our World",
+      "node",
+      "ruby",
+      "ruby-node",
+      "node-examples",
     ]);
   });
 });

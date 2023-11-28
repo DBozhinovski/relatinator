@@ -20,7 +20,9 @@ Full post describing the process here: https://darko.io/posts/build-you-a-relate
 ## Features
 
 - Train a tf-idf classifier with your content
-- Get N-related posts for a given post as input
+- Get N-related posts for a given documents as input
+- Get top N keywords for a given documents id as input
+- Get top related documents for a given term
 
 ## Usage
 
@@ -32,7 +34,7 @@ npm i relatinator
 
 ### Training
 
-Before you can get related posts, you need to train the TF-IDF with your content. To that end, the library exposes a `train` function that takes an array of documents as input. A document is defined as an object with an `id` and `content` property:
+Before you can get related documents, you need to train the TF-IDF with your content. To that end, the library exposes a `train` function that takes an array of documents as input. A document is defined as an object with an `id` and `content` property:
 
 - `id` - a unique identifier for the document
 - `content` - the document's contents; These are expected to be a string. You can concatenate any metadata, descriptions, or anything else you might want to use for matching.
@@ -58,13 +60,13 @@ const documents = [
 train(documents);
 ```
 
-### Getting related posts
+### Getting related documents
 
-Once you've trained the classifier, you can get related posts for a given post by using the `getRelated` function. It takes the following arguments:
+Once you've trained the classifier, you can get related documents for a given document by using the `getRelated` function. It takes the following arguments:
 
-- `documentToCompare` - the content of the post for which you want to get related posts
-- `id` - the id of the post for which you want to get related posts
-- `topN` - the number of related posts you want to get
+- `documentToCompare` - the content of the document for which you want to get related documents
+- `id` - the id of the document for which you want to get related documents
+- `topN` - the number of related documents you want to get
 
 ```ts
 import { train, getRelated } from "relatinator";
@@ -90,11 +92,47 @@ train(documents);
 const related = getRelated("This is the first document", "1", 2);
 ```
 
+### Getting top keywords for a document
+
+You can also get the top keywords for a given document id by using the `getTopTerms` function. It takes the following arguments:
+
+- `id` - the id of the document you want to get top terms for
+- `topN` - the number of top terms you want to get
+
+```ts
+
+// Assuming you've already trained the classifier
+import { getTopTerms } from "relatinator";
+
+getTopTerms("your-doc-id-here", 2);
+
+// Example output: 
+// -> [{ term: 'term1', tfidf: 0.123 }, { term: 'term2', tfidf: 0.456 }]
+
+```
+
+### Getting top related documents for a term
+
+Getting top related documents for a term is also possible. You can use the `getTopRelatedDocumentsForTerm` function. It takes the following arguments:
+
+- `term` - the term you want to get top related documents for
+- `topN` - the number of top related documents you want to get
+
+```ts
+import { getTopRelatedDocumentsForTerm } from "relatinator";
+
+getTopRelatedDocumentsForTerm("term", 2);
+
+// Example output:
+// -> ["doc-id-1", "doc-id-2"]
+```
+
 ## Roadmap
 
-- [x] Reduce bundle size (natural isn't too tree-shakeable) - externalized it and made it a peer dep.
+- [x] ~Reduce bundle size (natural isn't too tree-shakeable).~ Externalized it and made it a peer dep in v 1.0.3.
 - [ ] Add practical examples
-- [ ] Add support for extracting top N keywords from a document (possible utility with automated tagging and linking)
+- [x] ~Add support for extracting top N keywords from a document (possible utility with automated tagging and linking)~ Added in v1.1.0.
+- [ ] Add summarization support (useful for auto-generated descriptions); Will likely have to use Transfromers for this one.
 
 ## Acknowledgment
 
