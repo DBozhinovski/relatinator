@@ -1,0 +1,42 @@
+{
+  "name": "astro-relatinator",
+  "version": "1.0.0",
+  "description": "Find related content in your Astro website or app",
+  "author": "Darko Bozhinovski <dbozhinovski@gmail.com>",
+  "license": "MIT",
+  "keywords": [
+    "astro",
+    "related-content",
+    "tfidf",
+    "relatinator",
+    "related",
+    "words",
+    "posts",
+    "articles",
+    "static"
+  ],
+  "files": [
+    "integration.ts"
+  ],
+  "exports": {
+    ".": "./integration.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DBozhinovski/relatinator"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "astro": "3",
+    "husky": "^8.0.3",
+    "natural": "^6.10.3"
+  },
+  "dependencies": {
+    "glob": "^10.3.10",
+    "relatinator": "^1.1.0"
+  },
+  "peerDependencies": {
+    "astro": "3"
+  }
+}

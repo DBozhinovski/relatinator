@@ -100,15 +100,13 @@ You can also get the top keywords for a given document id by using the `getTopTe
 - `topN` - the number of top terms you want to get
 
 ```ts
-
 // Assuming you've already trained the classifier
 import { getTopTerms } from "relatinator";
 
 getTopTerms("your-doc-id-here", 2);
 
-// Example output: 
+// Example output:
 // -> [{ term: 'term1', tfidf: 0.123 }, { term: 'term2', tfidf: 0.456 }]
-
 ```
 
 ### Getting top related documents for a term

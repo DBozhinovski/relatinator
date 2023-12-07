@@ -1,0 +1,75 @@
+{
+  "name": "relatinator",
+  "description": "A humble library for finding related posts and content. Uses tf-idf under the hood. Primarily aimed at static site generators.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DBozhinovski/relatinator"
+  },
+  "keywords": [
+    "relatinator",
+    "related",
+    "words",
+    "posts",
+    "articles",
+    "static"
+  ],
+  "version": "1.1.0",
+  "main": "./dist/relatinator.mjs",
+  "module": "./dist/relatinator.mjs",
+  "exports": {
+    ".": {
+      "require": "./dist/relatinator.cjs",
+      "import": "./dist/relatinator.mjs",
+      "types": "./dist/relatinator.d.ts"
+    }
+  },
+  "types": "./dist/relatinator.d.ts",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "rimraf dist && tsc && vite build && dts-bundle-generator --config ./dts-bundle-generator.config.ts",
+    "build-tsup": "tsup ./src/index.ts",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint:scripts": "eslint . --ext .ts",
+    "lint:styles": "stylelint ./**/*.{css,scss}",
+    "format:scripts": "prettier . --write",
+    "format:styles": "stylelint ./**/*.{css,scss} --fix",
+    "format": "npm run format:scripts && npm run format:styles"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.1",
+    "@types/node": "^20.4.9",
+    "@typescript-eslint/eslint-plugin": "^6.3.0",
+    "@typescript-eslint/parser": "^6.3.0",
+    "@vitest/coverage-v8": "^0.34.1",
+    "dts-bundle-generator": "^8.0.1",
+    "eslint": "^8.46.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "gray-matter": "^4.0.3",
+    "lint-staged": "^13.2.3",
+    "postcss": "^8.4.27",
+    "postcss-scss": "^4.0.6",
+    "prettier": "^3.0.1",
+    "rimraf": "^5.0.1",
+    "stylelint": "^14.16.1",
+    "stylelint-config-prettier": "^9.0.5",
+    "stylelint-config-recommended": "^9.0.0",
+    "stylelint-config-sass-guidelines": "^9.0.1",
+    "stylelint-prettier": "^3.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6",
+    "vite": "^4.4.9",
+    "vite-plugin-node-polyfills": "^0.17.0",
+    "vitest": "^0.34.1",
+    "astro": "^3.6.4"
+  },
+  "dependencies": {
+    "glob": "^10.3.10",
+    "natural": "^6.9.2"
+  },
+  "peerDependencies": {
+    "natural": "^6.9.2",
+    "astro": "^3.6.4"
+  }
+}

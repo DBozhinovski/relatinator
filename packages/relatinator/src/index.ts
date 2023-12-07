@@ -3,7 +3,7 @@ import pkg, { TfIdfDocument } from "natural";
 const { TfIdf } = pkg;
 export const tfIdf = new TfIdf();
 
-interface Document {
+export interface Document {
   id: string;
   content: string;
 }

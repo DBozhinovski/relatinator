@@ -34,9 +34,7 @@ module.exports = defineConfig({
     },
     rollupOptions: {
       external: ["natural"],
-    }
+    },
   },
-  test: {
-
-  }
+  test: {},
 });
