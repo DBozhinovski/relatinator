@@ -131,6 +131,7 @@ getTopRelatedDocumentsForTerm("term", 2);
 - [ ] Add practical examples
 - [x] ~Add support for extracting top N keywords from a document (possible utility with automated tagging and linking)~ Added in v1.1.0.
 - [ ] Add summarization support (useful for auto-generated descriptions); Will likely have to use Transfromers for this one.
+- [x] ~Migrate to monorepo and add Astro integration~ Added in v1.2.0.
 
 ## Acknowledgment
 
