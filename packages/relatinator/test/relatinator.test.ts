@@ -13,7 +13,7 @@ import matter from "gray-matter";
 
 const readMDFiles = () => {
   // Resolve the full path of the directory
-  const fullPath = path.resolve("./test/fixtures");
+  const fullPath = path.resolve(`${__dirname}/fixtures`);
 
   // Read all file names in the directory
   const fileNames = fs.readdirSync(fullPath);
