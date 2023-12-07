@@ -7,13 +7,25 @@ import fs from "node:fs/promises";
 import { TfIdfDocument } from "natural";
 import { Document } from "relatinator";
 
-async function trainModel(paths: string[]) {
+const stringifyData = (data: any): string => {
+  if (typeof data === 'object') {
+    if (Array.isArray(data)) {
+      return data.map(stringifyData).join(' ');
+    } else {
+      return Object.values(data).map(stringifyData).join(' ');
+    }
+  } else {
+    return String(data);
+  }
+}
+
+async function trainModel(paths: string[], schema: string[]) {
   const documents: Document[] = [];
 
   if (tfIdf.documents) {
     if ((tfIdf.documents as unknown as TfIdfDocument[]).length > 0) {
       (tfIdf.documents as unknown as TfIdfDocument[]) = [];
-      (tfIdf.documents as unknown as TfIdfDocument[]).length = -1;
+      (tfIdf.documents as unknown as TfIdfDocument[]).length = 0;
     }
   }
 
@@ -26,11 +38,17 @@ async function trainModel(paths: string[]) {
       const idArr = file.split("/");
       const id = idArr[idArr.length - 1];
 
+      let documentContent = '';
+      for (const key of schema) {
+        if (parsed.data[key]) {
+          documentContent += ' ' + stringifyData(parsed.data[key]);
+        }
+      }
+      documentContent += ' ' + parsed.content;
+
       documents.push({
         id,
-        content: `${parsed.data.title} ${
-          parsed.data.description
-        } ${parsed.data.tags.join(" ")} ${parsed.content}`,
+        content: documentContent,
       });
     }
   }
@@ -40,8 +58,10 @@ async function trainModel(paths: string[]) {
 
 const relatinatorIntegration = ({
   paths,
+  schema,
 }: {
   paths: string[];
+  schema: string[];
 }): AstroIntegration => {
   return {
     name: "astro-relatinator",
@@ -50,7 +70,7 @@ const relatinatorIntegration = ({
         logger.info("relatinator server:setup");
 
         logger.info("Training TF-IDF on existing data...");
-        await trainModel(paths);
+        await trainModel(paths, schema);
         logger.info("Initial training done.");
 
         server.watcher.on("all", async (eventName, filePath) => {
@@ -62,14 +82,22 @@ const relatinatorIntegration = ({
             logger.info(
               `Markdown file changed: ${filePath}; Re-training TF-IDF...`
             );
-            await trainModel(paths);
+            await trainModel(paths, schema);
           } else {
             return;
           }
         });
       },
+      "astro:build:setup": async ({ logger }) => {
+        logger.info("relatinator build:setup");
+
+        logger.info("Training TF-IDF on existing data...");
+        await trainModel(paths, schema);
+        logger.info("Training done.");
+      }
     },
   };
 };
 
 export default relatinatorIntegration;
+export { findRelated, tfIdf } from "relatinator";
