@@ -17,6 +17,6 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["vite/client", "node"],
   },
-  "include": ["src", "../astro-relatinator/integration.ts"],
+  "include": ["src"],
   "exclude": ["**/*.test.ts", "node_modules", "test/**", ".history/**"]
 }
