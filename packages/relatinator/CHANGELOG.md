@@ -2,6 +2,10 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
+## [1.3.0] - 2024-02-19
+
+- Fixes a stale dep version that cause issues with Astro 4.
+
 ## [1.2.0] - 2023-12-07
 
 - Migrates to a monorepo

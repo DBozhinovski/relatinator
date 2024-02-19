@@ -1,6 +1,6 @@
 {
   "name": "astro-relatinator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Find related content in your Astro website or app",
   "author": "Darko Bozhinovski <dbozhinovski@gmail.com>",
   "license": "MIT",
