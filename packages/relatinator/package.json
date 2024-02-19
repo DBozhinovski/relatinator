@@ -62,7 +62,7 @@
     "vite": "^4.4.9",
     "vite-plugin-node-polyfills": "^0.17.0",
     "vitest": "^0.34.1",
-    "astro": "^3.6.4"
+    "astro": ">=3"
   },
   "dependencies": {
     "glob": "^10.3.10",
@@ -70,6 +70,6 @@
   },
   "peerDependencies": {
     "natural": "^6.9.2",
-    "astro": "^3.6.4"
+    "astro": ">=3"
   }
 }
