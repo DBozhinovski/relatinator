@@ -1,6 +1,6 @@
 {
   "name": "astro-relatinator",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Find related content in your Astro website or app",
   "author": "Darko Bozhinovski <dbozhinovski@gmail.com>",
   "license": "MIT",
@@ -28,16 +28,17 @@
   },
   "type": "module",
   "devDependencies": {
-    "@types/node": "^20.10.4",
-    "astro": ">=3",
-    "husky": "^8.0.3",
-    "natural": "^6.10.3"
+    "@types/node": "^22.13.4",
+    "astro": ">=5",
+    "husky": "^9.1.7",
+    "vite": "^6.1.0"
   },
   "dependencies": {
-    "glob": "^10.3.10",
-    "relatinator": "^1.1.0"
+    "glob": "^11.0.1",
+    "gray-matter": "^4.0.3",
+    "relatinator": "workspace:*"
   },
   "peerDependencies": {
-    "astro": ">=3"
+    "astro": ">=5"
   }
 }

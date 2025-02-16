@@ -3,9 +3,7 @@
   "private": "true",
   "scripts": {
     "check": "tsc",
-    "test": "vitest --run --threads false",
-    "prepare": "husky install && husky set .husky/pre-commit 'npx lint-staged' && git add .husky/pre-commit",
-    "uninstall-husky": "npm uninstall husky --no-save && git config --unset core.hooksPath && npx rimraf .husky"
+    "test": "vitest"
   },
   "workspaces": [
     "packages/*"
@@ -13,9 +11,9 @@
   "devDependencies": {
     "@changesets/changelog-github": "0.5",
     "@changesets/cli": "2",
-    "astro": "4",
-    "husky": "^8.0.0",
-    "typescript": "5.3",
-    "vitest": "0.34"
+    "astro": "5",
+    "husky": "^9.1.7",
+    "typescript": "5.7",
+    "vitest": "3.0"
   }
 }

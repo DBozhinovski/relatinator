@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  tfIdf,
+  getInstance,
   train,
   findRelated,
   getTopTermsForId,
   getTopRelatedDocumentsForTerm,
 } from "../src";
-import { TfIdfDocument } from "natural";
+import type { TfIdfDocument } from "natural";
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
@@ -50,17 +50,18 @@ const documents = [
 describe("relatinator, simple", () => {
   it("should be trainable", () => {
     train(documents);
-    const docLength = (tfIdf.documents as unknown as TfIdfDocument[]).length;
+    const docLength = (getInstance().documents as unknown as TfIdfDocument[])
+      .length;
     expect(docLength).toBe(4);
   });
 
-  it("should find related documents", () => {
-    const related = findRelated(documents[0].content, documents[0].id, 1);
+  it("should find related documents", async () => {
+    const related = await findRelated(documents[0].content, documents[0].id, 1);
     expect(related).toEqual(["node-examples"]);
   });
 
-  it("should be able to match documents properly", () => {
-    const related = findRelated(documents[0].content, documents[0].id, 3);
+  it("should be able to match documents properly", async () => {
+    const related = await findRelated(documents[0].content, documents[0].id, 3);
     expect(related).toEqual(["node-examples", "ruby-node", "ruby"]);
   });
 });
@@ -78,13 +79,14 @@ describe("relatinator, complex", () => {
 
     train(documents);
 
-    const docLength = (tfIdf.documents as unknown as TfIdfDocument[]).length;
+    const docLength = (getInstance().documents as unknown as TfIdfDocument[])
+      .length;
 
     expect(docLength).toBe(9);
   });
 
-  it("should find related documents", () => {
-    const related = findRelated(
+  it("should find related documents", async () => {
+    const related = await findRelated(
       mdDocs[0].rawBody,
       mdDocs[0].frontMatter.title,
       1
@@ -93,16 +95,18 @@ describe("relatinator, complex", () => {
     expect(related[0]).toEqual("Example Markdown Document");
   });
 
-  it("should be able to match documents properly", () => {
-    const related = findRelated(
+  it("should be able to match documents properly", async () => {
+    const related = await findRelated(
       mdDocs[0].rawBody,
       mdDocs[0].frontMatter.title,
       3
     );
 
-    tfIdf.listTerms(4).forEach((item) => {
-      console.log(item.term + ": " + item.tfidf);
-    });
+    getInstance()
+      .listTerms(4)
+      .forEach((item) => {
+        console.log(item.term + ": " + item.tfidf);
+      });
 
     expect(related).toEqual([
       "Example Markdown Document",

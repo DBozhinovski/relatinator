@@ -1,0 +1,23 @@
+---
+import Welcome from '../components/Welcome.astro';
+import Layout from '../layouts/Layout.astro';
+// import { trainRelatinator, getRelatedPosts } from '../utils/relatinator';
+import { getCollection } from 'astro:content';
+import { findRelated } from 'astro-relatinator';
+// await trainRelatinator();
+
+const posts = await getCollection("posts");
+
+console.log("posts:", posts[0].data.title);
+
+// console.log("finding posts for:", posts[0].data.title);
+const relatedPosts = await findRelated(`${posts[0].data.title} ${posts[0].data.categories.join(" ")} ${posts[0].data.tags.join(" ")} ${posts[0].body}`, posts[0].id, 2);
+
+console.log("relatedPosts:", relatedPosts);
+
+// console.log(relatedPosts.map((post: any) => post.data.title));
+---
+
+<Layout>
+	<Welcome />
+</Layout>
