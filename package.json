@@ -3,7 +3,8 @@
   "private": "true",
   "scripts": {
     "check": "tsc",
-    "test": "vitest"
+    "test": "vitest",
+    "build": "pnpm --filter relatinator build"
   },
   "workspaces": [
     "packages/*"
