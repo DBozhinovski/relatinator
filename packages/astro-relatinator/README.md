@@ -10,7 +10,7 @@ Assuming you're running Astro v3 or later, you can install this integration by r
 npx astro add astro-relatinator
 ```
 
-OR 
+OR
 
 ```
 npm install astro-relatinator
@@ -18,7 +18,12 @@ npm install astro-relatinator
 
 ## Configuration
 
-The integration takes a single input argument, `paths`, which is an array of paths to the `.md` or `.mdx` files you want to use for training the model. If you're using the [Content Collections API](https://docs.astro.build/en/guides/content-collections/), you can find these at `./src/collections/<collection-name>/`.
+The integration takes four input arguments, `paths`, `schema`, `similarityMethod`, and `debug`.
+
+- `paths` is an array of paths to the `.md` or `.mdx` files you want to use for training the model. If you're using the [Content Collections API](https://docs.astro.build/en/guides/content-collections/), you can find these at `./src/collections/<collection-name>/`.
+- `schema` is an array of frontmatter fields you want to use for training the model.
+- `similarityMethod` is the algorithm to use for training the model. Can be `"tfidf"` or `"bm25"`.
+- `debug` is a boolean flag to enable debug mode. It gets VERY verbose, so use it with caution.
 
 ### Example:
 
@@ -30,31 +35,33 @@ export default defineConfig({
     relatinatorIntegration({
       paths: ["./src/content/posts"], // path yo your content files
       schema: ["title", "descriptions", "tags"], // frontmatter fields to use for training
+      similarityMethod: "bm25", // use BM25 for training
+      debug: true, // enable debug mode
     }),
     // ...
   ],
 });
 ```
 
-__Note:__ the fields you specify in the `schema` array must be present in the frontmatter of the files you're training on. If they're not, the integration will throw an error or lead to unexpected results.
+**Note:** the fields you specify in the `schema` array must be present in the frontmatter of the files you're training on. If they're not, the integration will throw an error or lead to unexpected results.
 
 ## Usage
 
-The integration hooks into the Astro build (or dev) process, and will traing the tf-idf model based on the files you've provided. You can then use the `find` function from the package to find related content.
+The integration hooks into the Astro build (or dev) process, and will train the model based on the files you've provided. You can then use the `findRelated` function from the package to find related content.
 
 ### Example:
 
 ```astro
 ---
 import { getCollection } from "astro:content";
-import { find } from "astro-relatinator";
+import { findRelated } from "astro-relatinator";
 
 const blogEntries = await getCollection("posts"); // assuming your collection is called posts
 // let's say we want to compare against the first blog entry
 const first = blogEntries[0];
 
 // Concatenate the same fields we used for training and declare how many related posts we want to find
-const related = find(`${first.frontmatter.title} ${first.frontmatter.description} ${first.frontmatter.tags.join(' ')} ${first.body}`, 3)
+const related = findRelated(`${first.frontmatter.title} ${first.frontmatter.description} ${first.frontmatter.tags.join(' ')} ${first.body}`, first.id, 3)
 
 ---
 

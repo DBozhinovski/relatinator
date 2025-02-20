@@ -1,10 +1,10 @@
 import type { AstroIntegration } from "astro";
 import path from "node:path";
-import { train, resetInstance, getInstance } from "relatinator";
+import { train, getInstance } from "relatinator";
 import { glob } from "glob";
 import matter from "gray-matter";
 import fs from "node:fs/promises";
-import { Document } from "relatinator";
+import { RelatinatorDocument } from "relatinator";
 
 // Helper to write debug info to a file
 async function writeDebug(message: string) {
@@ -12,7 +12,7 @@ async function writeDebug(message: string) {
 }
 
 async function trainModel(paths: string[], schema: string[], debug = false) {
-  const documents: Document[] = [];
+  const documents: RelatinatorDocument[] = [];
 
   if (debug) {
     await writeDebug("[trainModel] Training TF-IDF on existing data...");

@@ -2,6 +2,11 @@
 
 All notable changes to the "astro-relatinator" project will be documented in this file.
 
+## [2.0.0] - 2025-02-20
+
+- Adds support for BM25. You can now choose between BM25 and the default TF-IDF vectorizer.
+- Support for Astro 5.
+
 ## [1.2.0] - 2024-02-19
 
 - Fixes a stale dep version that cause issues with Astro 4.

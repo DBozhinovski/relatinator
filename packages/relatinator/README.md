@@ -86,9 +86,6 @@ pnpm install
 
 # Run tests
 pnpm test
-
-# Type check
-pnpm check
 ```
 
 ## License
