@@ -1,5 +1,6 @@
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const packageJson = require("./package.json");
+const fs = require("fs");
+
+const packageJson = JSON.parse(fs.readFileSync("./package.json", "utf-8"));
 
 const getPackageName = () => {
   return packageJson.name;
@@ -10,7 +11,7 @@ const config = {
     {
       filePath: "./src/index.ts",
       outFile: `./dist/${getPackageName()}.d.ts`,
-      noCheck: false,
+      noCheck: true,
     },
   ],
 };

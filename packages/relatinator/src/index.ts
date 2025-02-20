@@ -1,50 +1,70 @@
-import pkg, { TfIdfDocument } from "natural";
+import pkg from "natural";
+import * as TfIdfUtils from "./tfidf";
+import * as BM25Utils from "./bm25";
+import type {
+  BM25VectorizerType,
+  RelatinatorDocument,
+  SimilarityMethod,
+} from "./types";
 
 const { TfIdf } = pkg;
 
-async function writeDebug(message: string) {
-  console.log("[relatinator DEBUG]", message);
-}
-
 declare global {
-  var instance: InstanceType<typeof TfIdf> | undefined;
+  var instance: InstanceType<typeof TfIdf> | BM25VectorizerType | undefined;
+  var relatinatorState: {
+    method: SimilarityMethod;
+    documentMap: Map<number, string>;
+  };
 }
 
-export const getInstance = () => {
+globalThis.relatinatorState = {
+  method: "tfidf",
+  documentMap: new Map(),
+};
+
+export type { BM25VectorizerType, RelatinatorDocument, SimilarityMethod };
+
+export const getInstance = async (
+  similarityMethod: SimilarityMethod = "tfidf"
+) => {
   if (!globalThis.instance) {
-    globalThis.instance = new TfIdf();
+    if (similarityMethod === "tfidf") {
+      globalThis.instance = TfIdfUtils.getInstance();
+      globalThis.relatinatorState.method = "tfidf";
+    } else if (similarityMethod === "bm25") {
+      globalThis.relatinatorState.method = "bm25";
+      globalThis.instance = await BM25Utils.getInstance();
+    } else {
+      throw new Error(`Unsupported similarity method: ${similarityMethod}`);
+    }
   }
   return globalThis.instance;
 };
 
-export const resetInstance = () => {
-  globalThis.instance = new TfIdf();
+export const resetInstance = async () => {
+  if (globalThis.relatinatorState.method === "tfidf") {
+    globalThis.instance = TfIdfUtils.getInstance();
+  } else if (globalThis.relatinatorState.method === "bm25") {
+    globalThis.instance = await BM25Utils.resetInstance();
+  } else {
+    throw new Error(
+      `Unsupported similarity method: ${globalThis.relatinatorState.method}`
+    );
+  }
   return globalThis.instance;
 };
 
-export interface Document {
-  id: string;
-  content: string;
-}
-
-export const train = async (documents: Document[], debug: boolean = false) => {
-  if (debug) {
-    await writeDebug(
-      "[relatinator, train] Training TF-IDF on existing data..."
-    );
-    await writeDebug(
-      `[relatinator, train] Number of documents: ${documents.length}`
-    );
-  }
-
-  documents.forEach((document) => {
-    getInstance().addDocument(document.content, document.id);
-  });
-
-  if (debug) {
-    await writeDebug("[relatinator, train] End of training state:");
-    await writeDebug(
-      `[relatinator, train] Documents in TF-IDF: ${(getInstance().documents as any[]).map((doc: any) => doc.__key).join(", ")}`
+export const train = async (
+  documents: RelatinatorDocument[],
+  debug: boolean = false
+) => {
+  if (globalThis.relatinatorState.method === "tfidf") {
+    TfIdfUtils.train(documents, debug);
+  } else if (globalThis.relatinatorState.method === "bm25") {
+    await BM25Utils.train(documents, debug);
+  } else {
+    throw new Error(
+      `Unsupported similarity method: ${globalThis.relatinatorState.method}`
     );
   }
 };
@@ -54,111 +74,45 @@ export const findRelated = async (
   id: string,
   topN: number = 5,
   debug: boolean = false
-) => {
-  if (debug) {
-    await writeDebug(
-      `[relatinator, findRelated] Input document: ${documentToCompare.substring(0, 100)}...`
-    );
-    await writeDebug(
-      `[relatinator, findRelated] Looking for documents related to ID: ${id}`
-    );
-    await writeDebug(
-      `[relatinator, findRelated] Current TF-IDF state: ${(getInstance().documents as any[]).map((doc: any) => doc.__key).join(", ")}`
+): Promise<string[]> => {
+  if (globalThis.relatinatorState.method === "tfidf") {
+    return TfIdfUtils.findRelated(documentToCompare, id, topN, debug);
+  } else if (globalThis.relatinatorState.method === "bm25") {
+    return BM25Utils.findRelated(documentToCompare, id, topN, debug);
+  } else {
+    throw new Error(
+      `Unsupported similarity method: ${globalThis.relatinatorState.method}`
     );
   }
-
-  const scores: { index: number; score: number; key: string }[] = [];
-
-  getInstance().tfidfs(documentToCompare, (i, measure, key) => {
-    if (debug) {
-      writeDebug(
-        `[relatinator, findRelated] Score for document ${key}: ${measure}`
-      );
-    }
-    scores.push({
-      index: i,
-      score: measure,
-      key: typeof key === "string" ? key : "",
-    });
-  });
-
-  if (debug) {
-    await writeDebug(
-      `[relatinator, findRelated] All scores: ${JSON.stringify(scores)}`
-    );
-  }
-
-  const topScores = scores
-    .filter((entry) => entry.key !== id)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topN);
-
-  if (debug) {
-    await writeDebug(
-      `[relatinator, findRelated] Top scores: ${JSON.stringify(topScores)}`
-    );
-    await writeDebug(
-      `[relatinator, findRelated] Returning: ${topScores.map((score) => score.key).join(", ")}`
-    );
-  }
-
-  return topScores.map((score) => score.key);
 };
 
-export const getTopTermsForId = (
+export const getTopTermsForId = async (
   id: string,
   topN: number = 5,
   debug: boolean = false
 ) => {
-  const terms: { term: string; score: number }[] = [];
-
-  if (debug) {
-    console.log("[relatinator, getTopTermsForId] Id:", id);
-  }
-
-  const index = (
-    getInstance().documents as unknown as TfIdfDocument[]
-  ).findIndex((document) => {
-    return document.__key?.toString() === id;
-  });
-
-  if (index === -1) {
+  if (globalThis.relatinatorState.method === "tfidf") {
+    return TfIdfUtils.getTopTermsForId(id, topN, debug);
+  } else if (globalThis.relatinatorState.method === "bm25") {
+    return BM25Utils.getTopTermsForId(id, topN, debug);
+  } else {
     throw new Error(
-      `Could not find document for id: "${id}"; Make sure that your input id is correct.`
+      `Unsupported similarity method: ${globalThis.relatinatorState.method}`
     );
   }
-
-  let count = 0;
-
-  getInstance()
-    .listTerms(index)
-    .forEach((item) => {
-      if (count++ < topN) {
-        terms.push({ term: item.term, score: item.tfidf });
-      }
-    });
-
-  return terms;
 };
 
-export const getTopRelatedDocumentsForTerm = (
+export const getTopRelatedDocumentsForTerm = async (
   term: string,
   topN: number = 5
 ) => {
-  const scores: { index: number; score: number; key: string }[] = [];
-
-  getInstance().tfidfs(term, (i, measure, key) => {
-    scores.push({
-      index: i,
-      score: measure,
-      key: typeof key === "string" ? key : "",
-    });
-  });
-
-  const topScores = scores
-    .filter((entry) => entry.key !== term)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topN);
-
-  return topScores.map((score) => score.key);
+  if (globalThis.relatinatorState.method === "tfidf") {
+    return TfIdfUtils.getTopRelatedDocumentsForTerm(term, topN);
+  } else if (globalThis.relatinatorState.method === "bm25") {
+    return BM25Utils.getTopRelatedDocumentsForTerm(term, topN);
+  } else {
+    throw new Error(
+      `Unsupported similarity method: ${globalThis.relatinatorState.method}`
+    );
+  }
 };

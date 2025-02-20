@@ -1,6 +1,6 @@
 import type { AstroIntegration } from "astro";
 import path from "node:path";
-import { train, resetInstance } from "relatinator";
+import { train, resetInstance, getInstance } from "relatinator";
 import { glob } from "glob";
 import matter from "gray-matter";
 import fs from "node:fs/promises";
@@ -80,10 +80,12 @@ const stringifyData = (data: any): string => {
 const relatinatorIntegration = ({
   paths,
   schema,
+  similarityMethod = "tfidf",
   debug = false,
 }: {
   paths: string[];
   schema: string[];
+  similarityMethod?: "tfidf" | "bm25";
   debug?: boolean;
 }): AstroIntegration => {
   return {
@@ -92,8 +94,10 @@ const relatinatorIntegration = ({
       "astro:server:setup": async ({ server, logger }) => {
         logger.info("relatinator server:setup");
 
-        logger.info("Training TF-IDF on existing data...");
-        resetInstance();
+        logger.info(
+          `Training Relatinator using ${similarityMethod} on existing data...`
+        );
+        await getInstance(similarityMethod);
         await trainModel(paths, schema, debug);
         logger.info("Initial training done.");
 
@@ -104,9 +108,9 @@ const relatinatorIntegration = ({
 
           if (path.extname(filePath).includes("md")) {
             logger.info(
-              `Markdown file changed: ${filePath}; Re-training TF-IDF...`
+              `Markdown file changed: ${filePath}; Re-training ${similarityMethod}...`
             );
-            resetInstance();
+            await getInstance(similarityMethod);
             await trainModel(paths, schema, debug);
           } else {
             return;
@@ -116,9 +120,12 @@ const relatinatorIntegration = ({
       "astro:build:setup": async ({ logger }) => {
         logger.info("relatinator build:setup");
 
-        logger.info("Training TF-IDF on existing data...");
+        logger.info(
+          `Training Relatinator using ${similarityMethod} on existing data...`
+        );
+        await getInstance(similarityMethod);
         await trainModel(paths, schema, debug);
-        logger.info("Training done.");
+        logger.info(`Training done.`);
       },
     },
   };

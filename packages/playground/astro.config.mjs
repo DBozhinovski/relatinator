@@ -8,6 +8,7 @@ export default defineConfig({
     relatinatorIntegration({
       paths: ["src/content/posts"],
       schema: ["title", "categories", "tags"],
+      similarityMethod: "bm25",
       debug: true,
     }),
   ],

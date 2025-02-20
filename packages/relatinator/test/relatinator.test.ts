@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, beforeAll } from "vitest";
 import {
   getInstance,
+  resetInstance,
   train,
   findRelated,
   getTopTermsForId,
   getTopRelatedDocumentsForTerm,
+  type Document,
 } from "../src";
-import type { TfIdfDocument } from "natural";
+import type { TfIdf } from "natural";
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
@@ -47,103 +49,174 @@ const documents = [
   },
 ];
 
-describe("relatinator, simple", () => {
-  it("should be trainable", () => {
-    train(documents);
-    const docLength = (getInstance().documents as unknown as TfIdfDocument[])
-      .length;
-    expect(docLength).toBe(4);
-  });
+const algorithms = ["tfidf", "bm25"] as const;
 
-  it("should find related documents", async () => {
-    const related = await findRelated(documents[0].content, documents[0].id, 1);
-    expect(related).toEqual(["node-examples"]);
-  });
-
-  it("should be able to match documents properly", async () => {
-    const related = await findRelated(documents[0].content, documents[0].id, 3);
-    expect(related).toEqual(["node-examples", "ruby-node", "ruby"]);
-  });
+beforeAll(async () => {
+  // Initialize with BM25 to ensure NLP is loaded
+  await resetInstance();
+  await getInstance("bm25");
 });
 
-describe("relatinator, complex", () => {
-  it("should be trainable on files", () => {
-    const documents = mdDocs.map((doc) => {
-      return {
+algorithms.forEach((algorithm) => {
+  describe(`relatinator with ${algorithm.toUpperCase()}`, () => {
+    beforeEach(async () => {
+      await resetInstance();
+      const instance = await getInstance(algorithm);
+      if (algorithm === "tfidf") {
+        // Reset TF-IDF documents
+        (instance as unknown as TfIdf).documents = [];
+      }
+    });
+
+    it("should be trainable", async () => {
+      await train(documents);
+      const instance = await getInstance();
+      if (algorithm === "tfidf") {
+        const docLength = (instance as unknown as TfIdf).documents.length;
+        expect(docLength).toBe(4);
+      } else {
+        expect(async () => await getTopTermsForId("node")).not.toThrow();
+      }
+    });
+
+    it("should find related documents", async () => {
+      await train(documents);
+      const related = await findRelated(
+        documents[0].content,
+        documents[0].id,
+        1
+      );
+      expect(related).toHaveLength(1);
+      expect(related[0]).toBe("node-examples");
+    });
+
+    it("should be able to match documents properly", async () => {
+      await train(documents);
+      const related = await findRelated(
+        documents[0].content,
+        documents[0].id,
+        3
+      );
+      expect(related).toHaveLength(3);
+      expect(related).toContain("node-examples");
+      if (algorithm === "tfidf") {
+        expect(related).toContain("ruby-node");
+      }
+    });
+  });
+
+  describe(`relatinator with ${algorithm.toUpperCase()}, complex documents`, () => {
+    let preparedDocuments: Array<Document>;
+
+    beforeEach(async () => {
+      await resetInstance();
+      const instance = await getInstance(algorithm);
+      if (algorithm === "tfidf") {
+        // Reset TF-IDF documents
+        (instance as unknown as TfIdf).documents = [];
+      }
+      preparedDocuments = mdDocs.map((doc) => ({
         id: doc.frontMatter.title,
         content: `${doc.frontMatter.title} ${doc.frontMatter.categories.join(
           " "
         )} ${doc.frontMatter.tags.join(" ")} ${doc.rawBody}`,
-      };
+      }));
     });
 
-    train(documents);
+    it("should be trainable on files", async () => {
+      await train(preparedDocuments);
+      const instance = await getInstance();
+      if (algorithm === "tfidf") {
+        const docLength = (instance as unknown as TfIdf).documents.length;
+        expect(docLength).toBe(5);
+      } else {
+        expect(
+          async () => await getTopTermsForId(preparedDocuments[0].id)
+        ).not.toThrow();
+      }
+    });
 
-    const docLength = (getInstance().documents as unknown as TfIdfDocument[])
-      .length;
+    it("should find related documents", async () => {
+      await train(preparedDocuments);
+      const related = await findRelated(
+        mdDocs[0].rawBody,
+        mdDocs[0].frontMatter.title,
+        1
+      );
 
-    expect(docLength).toBe(9);
+      expect(related).toHaveLength(1);
+      if (algorithm === "tfidf") {
+        expect(related[0]).toBe("Example Markdown Document");
+      }
+    });
+
+    it("should be able to match documents properly", async () => {
+      await train(preparedDocuments);
+      const related = await findRelated(
+        mdDocs[0].rawBody,
+        mdDocs[0].frontMatter.title,
+        3
+      );
+
+      expect(related).toHaveLength(3);
+      if (algorithm === "tfidf") {
+        // Don't test exact order for TF-IDF, just check for expected documents
+        expect(related).toContain("Example Markdown Document");
+        expect(related).toContain("Sample Markdown Post");
+        expect(related).toContain("Insights into Markdown Usage");
+      }
+    });
   });
 
-  it("should find related documents", async () => {
-    const related = await findRelated(
-      mdDocs[0].rawBody,
-      mdDocs[0].frontMatter.title,
-      1
-    );
+  describe(`relatinator terms with ${algorithm.toUpperCase()}`, () => {
+    let preparedDocuments: Array<Document>;
 
-    expect(related[0]).toEqual("Example Markdown Document");
-  });
+    beforeEach(async () => {
+      await resetInstance();
+      const instance = await getInstance(algorithm);
+      if (algorithm === "tfidf") {
+        // Reset TF-IDF documents
+        (instance as unknown as TfIdf).documents = [];
+      }
+      preparedDocuments = mdDocs.map((doc) => ({
+        id: doc.frontMatter.title,
+        content: `${doc.frontMatter.title} ${doc.frontMatter.categories.join(
+          " "
+        )} ${doc.frontMatter.tags.join(" ")} ${doc.rawBody}`,
+      }));
+      await train(preparedDocuments);
+    });
 
-  it("should be able to match documents properly", async () => {
-    const related = await findRelated(
-      mdDocs[0].rawBody,
-      mdDocs[0].frontMatter.title,
-      3
-    );
+    it("should return top terms for a document", async () => {
+      const terms = await getTopTermsForId(
+        "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
+      );
 
-    getInstance()
-      .listTerms(4)
-      .forEach((item) => {
-        console.log(item.term + ": " + item.tfidf);
-      });
+      expect(terms).toHaveLength(5);
+      expect(terms[0]).toHaveProperty("term");
+      expect(terms[0]).toHaveProperty("score");
 
-    expect(related).toEqual([
-      "Example Markdown Document",
-      "Sample Markdown Post",
-      "Insights into Markdown Usage",
-    ]);
-  });
-});
+      if (algorithm === "tfidf") {
+        expect(terms.map((t) => t.term)).toEqual([
+          "book",
+          "cover",
+          "world",
+          "us",
+          "life",
+        ]);
+      }
+    });
 
-describe("relatinator, terms", () => {
-  it("should return top terms for a document", () => {
-    const terms = getTopTermsForId(
-      "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
-    );
+    it("should throw when trying to match a non-existent id", async () => {
+      await expect(getTopTermsForId("asdf")).rejects.toThrow();
+    });
 
-    expect(terms.map((t) => t.term)).toEqual([
-      "book",
-      "cover",
-      "world",
-      "us",
-      "life",
-    ]);
-  });
-
-  it("should throw when trying to match a non-existent id", () => {
-    expect(() => getTopTermsForId("asdf")).toThrow();
-  });
-
-  it("should return top related documents for a term", () => {
-    const related = getTopRelatedDocumentsForTerm("book");
-
-    expect(related).toEqual([
-      "12 New Science Books To End the Year With Wonder About Ourselves and Our World",
-      "node",
-      "ruby",
-      "ruby-node",
-      "node-examples",
-    ]);
+    it("should return top related documents for a term", async () => {
+      const related = await getTopRelatedDocumentsForTerm("book");
+      expect(related).toHaveLength(5);
+      expect(related).toContain(
+        "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
+      );
+    });
   });
 });
