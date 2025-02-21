@@ -3,10 +3,31 @@ import BM25Vectorizer, {
 } from "wink-nlp/utilities/bm25-vectorizer";
 import winkNLP from "wink-nlp";
 import model from "wink-eng-lite-web-model";
+import utils from "wink-nlp-utils";
 import { log } from "./util";
 import type { RelatinatorDocument } from "./index";
 
 let nlp: any;
+
+// Helper function to normalize text consistently across all operations
+const normalizeText = (text: string) => {
+  // Remove elisions (contractions) first
+  const withoutElisions = utils.string.removeElisions(text);
+  // Remove punctuation and extra spaces
+  const cleaned = utils.string.removePunctuations(withoutElisions);
+  const normalized = utils.string.removeExtraSpaces(cleaned);
+
+  // Get tokens using winkNLP for better tokenization
+  const tokens = nlp.readDoc(normalized).tokens().out(nlp.its.normal);
+
+  // Remove stopwords
+  const withoutStopwords = utils.tokens.removeWords(tokens);
+
+  // Apply stemming to each remaining token
+  const stemmed = withoutStopwords.map((token) => utils.string.stem(token));
+
+  return stemmed;
+};
 
 const initializeNLP = () => {
   if (!nlp) {
@@ -17,18 +38,18 @@ const initializeNLP = () => {
 };
 
 export const getInstance = async () => {
-  if (!globalThis.instance) {
-    globalThis.instance = BM25Vectorizer();
+  if (!globalThis.bm25Instance) {
+    globalThis.bm25Instance = BM25Vectorizer();
   }
   await initializeNLP();
-  return globalThis.instance as BM25VectorizerType;
+  return globalThis.bm25Instance as BM25VectorizerType;
 };
 
 export const resetInstance = async () => {
-  globalThis.instance = BM25Vectorizer();
+  globalThis.bm25Instance = BM25Vectorizer();
   globalThis.relatinatorState.documentMap.clear();
   await initializeNLP();
-  return globalThis.instance;
+  return globalThis.bm25Instance;
 };
 
 export const train = async (
@@ -40,12 +61,12 @@ export const train = async (
     log(`[relatinator, bm25, train] Number of documents: ${documents.length}`);
   }
 
-  const its = nlp.its;
   const instance = await getInstance();
 
   documents.forEach((document, index) => {
-    const tokens = nlp.readDoc(document.content).tokens().out(its.normal);
-    instance.learn(tokens);
+    // Normalize and process the document text
+    const processedTokens = normalizeText(document.content);
+    instance.learn(processedTokens);
     globalThis.relatinatorState.documentMap.set(index, document.id);
   });
 
@@ -72,18 +93,24 @@ export const findRelated = async (
     );
   }
 
-  const its = nlp.its;
-  const tokens = nlp.readDoc(documentToCompare).tokens().out(its.normal);
+  // Normalize and process the input document
+  const processedTokens = normalizeText(documentToCompare);
+
+  // If all terms were filtered out, return empty array
+  if (processedTokens.length === 0) {
+    return [];
+  }
+
   const instance = await getInstance();
 
   // Get document term matrix and terms
-  const docMatrix = instance.out(its.docTermMatrix as any) as number[][];
-  const terms = instance.out(its.terms as any) as string[];
+  const docMatrix = instance.out(nlp.its.docTermMatrix as any) as number[][];
+  const terms = instance.out(nlp.its.terms as any) as string[];
 
   // Calculate document scores by comparing token vectors
   const documentScores = docMatrix.map((docVector, idx) => {
     // Sum up the BM25 scores for matching terms
-    const score = tokens.reduce((sum: number, token: string) => {
+    const score = processedTokens.reduce((sum: number, token: string) => {
       const termIndex = terms.indexOf(token);
       return sum + (termIndex >= 0 ? docVector[termIndex] : 0);
     }, 0);
@@ -140,10 +167,9 @@ export const getTopTermsForId = async (
   }
 
   const instance = (await getInstance()) as BM25VectorizerType;
-  const its = nlp.its;
 
-  const docMatrix = instance.out(its.docTermMatrix as any) as number[][];
-  const terms = instance.out(its.terms as any) as string[];
+  const docMatrix = instance.out(nlp.its.docTermMatrix as any) as number[][];
+  const terms = instance.out(nlp.its.terms as any) as string[];
 
   const docVector = docMatrix[index];
 
@@ -159,26 +185,58 @@ export const getTopTermsForId = async (
 
 export const getTopRelatedDocumentsForTerm = async (
   term: string,
-  topN: number = 5
+  topN: number = 5,
+  debug: boolean = false
 ) => {
-  // Create a document with just the term
-  const termDoc = nlp.readDoc(term).tokens().out();
+  // Normalize and process the search term
+  const processedTokens = normalizeText(term);
+
+  // If all terms were filtered out, return empty array
+  if (processedTokens.length === 0) {
+    return [];
+  }
 
   // Get BM25 scores for the term against all documents
   const instance = await getInstance();
-  const scores = instance
-    .vectorOf(termDoc)
-    .map((score: number, idx: number) => ({
-      index: idx,
-      score,
-      key: globalThis.relatinatorState.documentMap.get(idx) || "",
-    }));
+  const docMatrix = instance.out(nlp.its.docTermMatrix as any) as number[][];
+  const terms = instance.out(nlp.its.terms as any) as string[];
+
+  // Find the term index in our vocabulary
+  const termIndex = terms.indexOf(processedTokens[0]);
+
+  // If term not found in vocabulary, return empty array
+  if (termIndex === -1) {
+    return [];
+  }
+
+  // Calculate scores for each document based on the term's BM25 score
+  const scores = docMatrix.map((docVector, idx) => ({
+    index: idx,
+    score: docVector[termIndex],
+    key: globalThis.relatinatorState.documentMap.get(idx) || "",
+  }));
+
+  if (debug) {
+    log(
+      `[relatinator, bm25, getTopRelatedDocumentsForTerm] All scores: ${JSON.stringify(
+        scores
+      )}`
+    );
+  }
 
   // Filter, sort and return top results
   const topScores = scores
-    .filter((entry) => entry.score > 0) // Filter out zero scores
-    .sort((a, b) => b.score - a.score)
+    .filter((entry) => entry.key !== "") // Only filter out empty keys
+    .sort((a, b) => b.score - a.score) // Sort by score, even if some are 0
     .slice(0, topN);
+
+  if (debug) {
+    log(
+      `[relatinator, bm25, getTopRelatedDocumentsForTerm] Top scores: ${JSON.stringify(
+        topScores
+      )}`
+    );
+  }
 
   return topScores.map((score) => score.key);
 };

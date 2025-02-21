@@ -1,19 +1,43 @@
 import pkg, { type TfIdfDocument } from "natural";
+import utils from "wink-nlp-utils";
 import { log } from "./util";
 import type { RelatinatorDocument } from "./index";
 
 const { TfIdf } = pkg;
 
+// Helper function to normalize text consistently across all operations
+const normalizeText = (text: string) => {
+  // Remove elisions (contractions) first
+  const withoutElisions = utils.string.removeElisions(text);
+  // Remove punctuation and extra spaces
+  const cleaned = utils.string.removePunctuations(withoutElisions);
+  const normalized = utils.string.removeExtraSpaces(cleaned);
+
+  // Tokenize and process each token
+  const tokens = utils.string
+    .tokenize(normalized, true)
+    .filter((token) => token.tag === "word")
+    .map((token) => token.value.toLowerCase());
+
+  // Remove stopwords
+  const withoutStopwords = utils.tokens.removeWords(tokens);
+
+  // Apply stemming to each remaining token
+  const stemmed = withoutStopwords.map((token) => utils.string.stem(token));
+
+  return stemmed;
+};
+
 export const getInstance = () => {
-  if (!globalThis.instance) {
-    globalThis.instance = new TfIdf();
+  if (!globalThis.tfidfInstance) {
+    globalThis.tfidfInstance = new TfIdf();
   }
-  return globalThis.instance as InstanceType<typeof TfIdf>;
+  return globalThis.tfidfInstance as InstanceType<typeof TfIdf>;
 };
 
 export const resetInstance = () => {
-  globalThis.instance = new TfIdf();
-  return globalThis.instance;
+  globalThis.tfidfInstance = new TfIdf();
+  return globalThis.tfidfInstance;
 };
 
 export const train = (
@@ -26,7 +50,11 @@ export const train = (
   }
 
   documents.forEach((document) => {
-    getInstance().addDocument(document.content, document.id);
+    // Normalize and process the document text
+    const processedTokens = normalizeText(document.content);
+
+    // Join back into a string for TFIDF
+    getInstance().addDocument(processedTokens.join(" "), document.id);
   });
 
   if (debug) {
@@ -50,17 +78,19 @@ export const findRelated = (
         100
       )}...`
     );
-    log(
-      `[relatinator, tfidf, findRelated] Looking for documents related to ID: ${id}`
-    );
-    log(
-      `[relatinator, tfidf, findRelated] Current TF-IDF state: ${(getInstance().documents as any[]).map((doc: any) => doc.__key).join(", ")}`
-    );
+  }
+
+  // Normalize and process the input document
+  const processedTokens = normalizeText(documentToCompare);
+
+  // If all terms were filtered out, return empty array
+  if (processedTokens.length === 0) {
+    return [];
   }
 
   const scores: { index: number; score: number; key: string }[] = [];
 
-  getInstance().tfidfs(documentToCompare, (i, measure, key) => {
+  getInstance().tfidfs(processedTokens.join(" "), (i, measure, key) => {
     if (debug) {
       log(
         `[relatinator, tfidf, findRelated] Score for document ${key}: ${measure}`
@@ -89,11 +119,6 @@ export const findRelated = (
       `[relatinator, tfidf, findRelated] Top scores: ${JSON.stringify(
         topScores
       )}`
-    );
-    log(
-      `[relatinator, tfidf, findRelated] Returning: ${topScores
-        .map((score) => score.key)
-        .join(", ")}`
     );
   }
 
@@ -140,9 +165,17 @@ export const getTopRelatedDocumentsForTerm = (
   term: string,
   topN: number = 5
 ) => {
+  // Normalize and process the search term
+  const processedTokens = normalizeText(term);
+
+  // If all terms were filtered out, return empty array
+  if (processedTokens.length === 0) {
+    return [];
+  }
+
   const scores: { index: number; score: number; key: string }[] = [];
 
-  getInstance().tfidfs(term, (i, measure, key) => {
+  getInstance().tfidfs(processedTokens.join(" "), (i, measure, key) => {
     scores.push({
       index: i,
       score: measure,

@@ -1,6 +1,6 @@
 import type { AstroIntegration } from "astro";
 import path from "node:path";
-import { train, getInstance } from "relatinator";
+import { TfIdfUtils, BM25Utils } from "relatinator";
 import { glob } from "glob";
 import matter from "gray-matter";
 import fs from "node:fs/promises";
@@ -11,7 +11,12 @@ async function writeDebug(message: string) {
   console.log("[astro-relatinator]", message);
 }
 
-async function trainModel(paths: string[], schema: string[], debug = false) {
+async function trainModel(
+  similarityMethod: "tfidf" | "bm25",
+  paths: string[],
+  schema: string[],
+  debug = false
+) {
   const documents: RelatinatorDocument[] = [];
 
   if (debug) {
@@ -62,7 +67,11 @@ async function trainModel(paths: string[], schema: string[], debug = false) {
   }
 
   // Train the existing instance
-  train(documents, debug);
+  if (similarityMethod === "tfidf") {
+    TfIdfUtils.train(documents, debug);
+  } else {
+    BM25Utils.train(documents, debug);
+  }
 }
 
 const stringifyData = (data: any): string => {
@@ -97,8 +106,12 @@ const relatinatorIntegration = ({
         logger.info(
           `Training Relatinator using ${similarityMethod} on existing data...`
         );
-        await getInstance(similarityMethod);
-        await trainModel(paths, schema, debug);
+        if (similarityMethod === "tfidf") {
+          await TfIdfUtils.getInstance();
+        } else {
+          await BM25Utils.getInstance();
+        }
+        await trainModel(similarityMethod, paths, schema, debug);
         logger.info("Initial training done.");
 
         server.watcher.on("all", async (eventName, filePath) => {
@@ -110,8 +123,12 @@ const relatinatorIntegration = ({
             logger.info(
               `Markdown file changed: ${filePath}; Re-training ${similarityMethod}...`
             );
-            await getInstance(similarityMethod);
-            await trainModel(paths, schema, debug);
+            if (similarityMethod === "tfidf") {
+              await TfIdfUtils.getInstance();
+            } else {
+              await BM25Utils.getInstance();
+            }
+            await trainModel(similarityMethod, paths, schema, debug);
           } else {
             return;
           }
@@ -123,13 +140,17 @@ const relatinatorIntegration = ({
         logger.info(
           `Training Relatinator using ${similarityMethod} on existing data...`
         );
-        await getInstance(similarityMethod);
-        await trainModel(paths, schema, debug);
+        if (similarityMethod === "tfidf") {
+          await TfIdfUtils.getInstance();
+        } else {
+          await BM25Utils.getInstance();
+        }
+        await trainModel(similarityMethod, paths, schema, debug);
         logger.info(`Training done.`);
       },
     },
   };
 };
 
-export { findRelated, getInstance } from "relatinator";
+export { TfIdfUtils, BM25Utils };
 export default relatinatorIntegration;

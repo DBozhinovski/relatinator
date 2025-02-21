@@ -1,17 +1,10 @@
 import { describe, expect, it, beforeEach, beforeAll } from "vitest";
-import {
-  getInstance,
-  resetInstance,
-  train,
-  findRelated,
-  getTopTermsForId,
-  getTopRelatedDocumentsForTerm,
-  type Document,
-} from "../src";
+import { TfIdfUtils, BM25Utils } from "../src";
 import type { TfIdf } from "natural";
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import type { RelatinatorDocument } from "../src";
 
 const readMDFiles = () => {
   // Resolve the full path of the directory
@@ -53,67 +46,92 @@ const algorithms = ["tfidf", "bm25"] as const;
 
 beforeAll(async () => {
   // Initialize with BM25 to ensure NLP is loaded
-  await resetInstance();
-  await getInstance("bm25");
+  await BM25Utils.resetInstance();
+  await BM25Utils.getInstance();
 });
 
 algorithms.forEach((algorithm) => {
+  const utils = algorithm === "tfidf" ? TfIdfUtils : BM25Utils;
+
   describe(`relatinator with ${algorithm.toUpperCase()}`, () => {
     beforeEach(async () => {
-      await resetInstance();
-      const instance = await getInstance(algorithm);
       if (algorithm === "tfidf") {
-        // Reset TF-IDF documents
-        (instance as unknown as TfIdf).documents = [];
+        TfIdfUtils.resetInstance();
+      } else {
+        await BM25Utils.resetInstance();
+        await BM25Utils.getInstance();
       }
     });
 
     it("should be trainable", async () => {
-      await train(documents);
-      const instance = await getInstance();
       if (algorithm === "tfidf") {
+        TfIdfUtils.train(documents);
+        const instance = TfIdfUtils.getInstance();
         const docLength = (instance as unknown as TfIdf).documents.length;
         expect(docLength).toBe(4);
       } else {
-        expect(async () => await getTopTermsForId("node")).not.toThrow();
+        await BM25Utils.train(documents);
+        expect(
+          async () => await BM25Utils.getTopTermsForId("node")
+        ).not.toThrow();
       }
     });
 
     it("should find related documents", async () => {
-      await train(documents);
-      const related = await findRelated(
-        documents[0].content,
-        documents[0].id,
-        1
-      );
-      expect(related).toHaveLength(1);
-      expect(related[0]).toBe("node-examples");
+      if (algorithm === "tfidf") {
+        TfIdfUtils.train(documents);
+        const related = TfIdfUtils.findRelated(
+          documents[0].content,
+          documents[0].id,
+          1
+        );
+        expect(related).toHaveLength(1);
+        expect(related[0]).toBe("node-examples");
+      } else {
+        await BM25Utils.train(documents);
+        const related = await BM25Utils.findRelated(
+          documents[0].content,
+          documents[0].id,
+          1
+        );
+        expect(related).toHaveLength(1);
+        expect(related[0]).toBe("node-examples");
+      }
     });
 
     it("should be able to match documents properly", async () => {
-      await train(documents);
-      const related = await findRelated(
-        documents[0].content,
-        documents[0].id,
-        3
-      );
-      expect(related).toHaveLength(3);
-      expect(related).toContain("node-examples");
       if (algorithm === "tfidf") {
+        TfIdfUtils.train(documents);
+        const related = TfIdfUtils.findRelated(
+          documents[0].content,
+          documents[0].id,
+          3
+        );
+        expect(related).toHaveLength(3);
+        expect(related).toContain("node-examples");
         expect(related).toContain("ruby-node");
+      } else {
+        await BM25Utils.train(documents);
+        const related = await BM25Utils.findRelated(
+          documents[0].content,
+          documents[0].id,
+          3
+        );
+        expect(related).toHaveLength(3);
+        expect(related).toContain("node-examples");
       }
     });
   });
 
   describe(`relatinator with ${algorithm.toUpperCase()}, complex documents`, () => {
-    let preparedDocuments: Array<Document>;
+    let preparedDocuments: Array<RelatinatorDocument>;
 
     beforeEach(async () => {
-      await resetInstance();
-      const instance = await getInstance(algorithm);
       if (algorithm === "tfidf") {
-        // Reset TF-IDF documents
-        (instance as unknown as TfIdf).documents = [];
+        TfIdfUtils.resetInstance();
+      } else {
+        await BM25Utils.resetInstance();
+        await BM25Utils.getInstance();
       }
       preparedDocuments = mdDocs.map((doc) => ({
         id: doc.frontMatter.title,
@@ -124,59 +142,73 @@ algorithms.forEach((algorithm) => {
     });
 
     it("should be trainable on files", async () => {
-      await train(preparedDocuments);
-      const instance = await getInstance();
       if (algorithm === "tfidf") {
+        TfIdfUtils.train(preparedDocuments);
+        const instance = TfIdfUtils.getInstance();
         const docLength = (instance as unknown as TfIdf).documents.length;
         expect(docLength).toBe(5);
       } else {
+        await BM25Utils.train(preparedDocuments);
         expect(
-          async () => await getTopTermsForId(preparedDocuments[0].id)
+          async () => await BM25Utils.getTopTermsForId(preparedDocuments[0].id)
         ).not.toThrow();
       }
     });
 
     it("should find related documents", async () => {
-      await train(preparedDocuments);
-      const related = await findRelated(
-        mdDocs[0].rawBody,
-        mdDocs[0].frontMatter.title,
-        1
-      );
-
-      expect(related).toHaveLength(1);
       if (algorithm === "tfidf") {
+        TfIdfUtils.train(preparedDocuments);
+        const related = TfIdfUtils.findRelated(
+          mdDocs[0].rawBody,
+          mdDocs[0].frontMatter.title,
+          1
+        );
+        expect(related).toHaveLength(1);
         expect(related[0]).toBe("Example Markdown Document");
+      } else {
+        await BM25Utils.train(preparedDocuments);
+        const related = await BM25Utils.findRelated(
+          mdDocs[0].rawBody,
+          mdDocs[0].frontMatter.title,
+          1
+        );
+        expect(related).toHaveLength(1);
       }
     });
 
     it("should be able to match documents properly", async () => {
-      await train(preparedDocuments);
-      const related = await findRelated(
-        mdDocs[0].rawBody,
-        mdDocs[0].frontMatter.title,
-        3
-      );
-
-      expect(related).toHaveLength(3);
       if (algorithm === "tfidf") {
-        // Don't test exact order for TF-IDF, just check for expected documents
+        TfIdfUtils.train(preparedDocuments);
+        const related = TfIdfUtils.findRelated(
+          mdDocs[0].rawBody,
+          mdDocs[0].frontMatter.title,
+          3
+        );
+        expect(related).toHaveLength(3);
         expect(related).toContain("Example Markdown Document");
         expect(related).toContain("Sample Markdown Post");
         expect(related).toContain("Insights into Markdown Usage");
+      } else {
+        await BM25Utils.train(preparedDocuments);
+        const related = await BM25Utils.findRelated(
+          mdDocs[0].rawBody,
+          mdDocs[0].frontMatter.title,
+          3
+        );
+        expect(related).toHaveLength(3);
       }
     });
   });
 
   describe(`relatinator terms with ${algorithm.toUpperCase()}`, () => {
-    let preparedDocuments: Array<Document>;
+    let preparedDocuments: Array<RelatinatorDocument>;
 
     beforeEach(async () => {
-      await resetInstance();
-      const instance = await getInstance(algorithm);
       if (algorithm === "tfidf") {
-        // Reset TF-IDF documents
-        (instance as unknown as TfIdf).documents = [];
+        TfIdfUtils.resetInstance();
+      } else {
+        await BM25Utils.resetInstance();
+        await BM25Utils.getInstance();
       }
       preparedDocuments = mdDocs.map((doc) => ({
         id: doc.frontMatter.title,
@@ -184,39 +216,63 @@ algorithms.forEach((algorithm) => {
           " "
         )} ${doc.frontMatter.tags.join(" ")} ${doc.rawBody}`,
       }));
-      await train(preparedDocuments);
+      if (algorithm === "tfidf") {
+        TfIdfUtils.train(preparedDocuments);
+      } else {
+        await BM25Utils.train(preparedDocuments);
+      }
     });
 
     it("should return top terms for a document", async () => {
-      const terms = await getTopTermsForId(
-        "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
-      );
-
-      expect(terms).toHaveLength(5);
-      expect(terms[0]).toHaveProperty("term");
-      expect(terms[0]).toHaveProperty("score");
-
       if (algorithm === "tfidf") {
+        const terms = TfIdfUtils.getTopTermsForId(
+          "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
+        );
+        expect(terms).toHaveLength(5);
+        expect(terms[0]).toHaveProperty("term");
+        expect(terms[0]).toHaveProperty("score");
         expect(terms.map((t) => t.term)).toEqual([
           "book",
           "cover",
           "world",
           "us",
-          "life",
+          "explor",
         ]);
+      } else {
+        const terms = await BM25Utils.getTopTermsForId(
+          "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
+        );
+        expect(terms).toHaveLength(5);
+        expect(terms[0]).toHaveProperty("term");
+        expect(terms[0]).toHaveProperty("score");
       }
     });
 
     it("should throw when trying to match a non-existent id", async () => {
-      await expect(getTopTermsForId("asdf")).rejects.toThrow();
+      if (algorithm === "tfidf") {
+        expect(() => TfIdfUtils.getTopTermsForId("asdf")).toThrow();
+      } else {
+        await expect(BM25Utils.getTopTermsForId("asdf")).rejects.toThrow();
+      }
     });
 
     it("should return top related documents for a term", async () => {
-      const related = await getTopRelatedDocumentsForTerm("book");
-      expect(related).toHaveLength(5);
-      expect(related).toContain(
-        "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
-      );
+      if (algorithm === "tfidf") {
+        const related = TfIdfUtils.getTopRelatedDocumentsForTerm("book");
+        expect(related).toHaveLength(5);
+        expect(related).toContain(
+          "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
+        );
+      } else {
+        const related = await BM25Utils.getTopRelatedDocumentsForTerm(
+          "book",
+          5
+        );
+        expect(related).toHaveLength(5);
+        expect(related).toContain(
+          "12 New Science Books To End the Year With Wonder About Ourselves and Our World"
+        );
+      }
     });
   });
 });
