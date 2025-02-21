@@ -2,7 +2,7 @@
 
 All notable changes to the "astro-relatinator" project will be documented in this file.
 
-## [2.1.0] - 2025-02-21
+## [2.0.1] - 2025-02-21
 
 - Adds stopword removal, stemming and elision removal to the input text.
 
