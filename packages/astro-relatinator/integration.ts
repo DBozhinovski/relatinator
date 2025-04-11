@@ -101,6 +101,8 @@ const relatinatorIntegration = ({
     name: "astro-relatinator",
     hooks: {
       "astro:server:setup": async ({ server, logger }) => {
+        let debounceTimeout: NodeJS.Timeout | null = null;
+        const debounceMs = 500; // Debounce delay in milliseconds
         logger.info("relatinator server:setup");
 
         logger.info(
@@ -114,23 +116,35 @@ const relatinatorIntegration = ({
         await trainModel(similarityMethod, paths, schema, debug);
         logger.info("Initial training done.");
 
-        server.watcher.on("all", async (eventName, filePath) => {
+        server.watcher.on("all", (eventName, filePath) => {
           if (!["add", "change"].includes(eventName)) {
             return;
           }
 
           if (path.extname(filePath).includes("md")) {
-            logger.info(
-              `Markdown file changed: ${filePath}; Re-training ${similarityMethod}...`
-            );
-            if (similarityMethod === "tfidf") {
-              await TfIdfUtils.getInstance();
-            } else {
-              await BM25Utils.getInstance();
+            // Clear existing timer if there is one
+            if (debounceTimeout) {
+              clearTimeout(debounceTimeout);
             }
-            await trainModel(similarityMethod, paths, schema, debug);
-          } else {
-            return;
+
+            // Set a new timer
+            debounceTimeout = setTimeout(async () => {
+              logger.info(
+                `Debounced: Markdown file changed: ${filePath}; Re-training ${similarityMethod}...`
+              );
+              try {
+                // Reset the instance before re-training
+                if (similarityMethod === "tfidf") {
+                  await TfIdfUtils.resetInstance();
+                } else {
+                  await BM25Utils.resetInstance();
+                }
+                await trainModel(similarityMethod, paths, schema, debug);
+                logger.info("Debounced re-training complete.");
+              } catch (error) {
+                logger.error(`Error during debounced re-training: ${error}`);
+              }
+            }, debounceMs);
           }
         });
       },

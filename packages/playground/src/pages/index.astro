@@ -17,5 +17,7 @@ console.log("relatedPosts:", relatedPosts);
 ---
 
 <Layout>
-	<Welcome />
+	<div>
+		{ posts.map((post) => <p>{post.data.title}</p>) }
+	</div>
 </Layout>

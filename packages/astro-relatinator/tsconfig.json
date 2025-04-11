@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "rootDir": "./src",
+    "rootDir": ".", // Allow files at the package root
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",

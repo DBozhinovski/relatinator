@@ -2,6 +2,11 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
+## [2.1.0] - 2025-04-11
+
+- **Fix:** Corrected API documentation and usage examples in README to accurately reflect the use of `BM25Utils` and `TfIdfUtils`.
+- **Docs:** Added documentation for the `resetInstance` function available on `BM25Utils` and `TfIdfUtils`.
+
 ## [2.0.1] - 2025-02-21
 
 - Adds stopword removal, stemming and elision removal to the input text.

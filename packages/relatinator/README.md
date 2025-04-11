@@ -23,16 +23,12 @@ yarn add relatinator
 ## Usage
 
 ```typescript
-import {
-  getInstance,
-  train,
-  findRelated,
-  getTopTermsForId,
-  getTopRelatedDocumentsForTerm,
-} from "relatinator";
+import { BM25Utils, TfIdfUtils } from "relatinator";
 
-// Initialize with your preferred algorithm
-await getInstance("bm25"); // or 'tfidf'
+// Example using BM25Utils. TfIdfUtils works similarly.
+
+// Ensure the instance is initialized (happens automatically on first use)
+await BM25Utils.getInstance();
 
 // Train the model with your documents
 const documents = [
@@ -41,42 +37,52 @@ const documents = [
   { id: "doc3", content: "A document about both cats and dogs." },
 ];
 
-await train(documents);
+await BM25Utils.train(documents);
 
 // Find related documents
-const related = await findRelated("A document about cats", "doc1", 2);
+const related = await BM25Utils.findRelated("A document about cats", "doc1", 2);
 console.log(related); // ['doc3', 'doc2']
 
 // Get top terms for a document
-const terms = await getTopTermsForId("doc1");
+const terms = await BM25Utils.getTopTermsForId("doc1");
 console.log(terms); // [{ term: 'cats', score: 0.8 }, ...]
 
 // Find documents related to a term
-const relatedDocs = await getTopRelatedDocumentsForTerm("cats");
+const relatedDocs = await BM25Utils.getTopRelatedDocumentsForTerm("cats");
 console.log(relatedDocs); // ['doc1', 'doc3']
 ```
 
 ## API
 
-### `getInstance(algorithm?: 'tfidf' | 'bm25')`
+The library exports two main utility objects: `BM25Utils` and `TfIdfUtils`.
 
-Initializes or returns the current instance with the specified algorithm.
+### `BM25Utils` / `TfIdfUtils`
 
-### `train(documents: Document[], debug?: boolean)`
+These objects contain the methods for interacting with the respective algorithms.
 
-Trains the model with the provided documents.
+#### `getInstance(): Promise<BM25VectorizerType | TfIdf>`
 
-### `findRelated(documentToCompare: string, id: string, topN?: number, debug?: boolean)`
+Returns a promise that resolves with the singleton instance of the vectorizer/model. Ensures the underlying NLP model is initialized. Usually not needed for direct use, as other methods call it internally.
 
-Finds documents related to the input document.
+#### `resetInstance(): Promise<BM25VectorizerType | TfIdf>`
 
-### `getTopTermsForId(id: string, topN?: number, debug?: boolean)`
+Resets the singleton instance, clearing all learned data and the internal document map. Returns the new, empty instance. Necessary if you need to retrain from scratch without restarting the application.
 
-Gets the top terms for a document by its ID.
+#### `train(documents: RelatinatorDocument[], debug?: boolean): Promise<void>`
 
-### `getTopRelatedDocumentsForTerm(term: string, topN?: number)`
+Trains the model with the provided documents. `RelatinatorDocument` is `{ id: string, content: string }`.
 
-Finds documents related to a specific term.
+#### `findRelated(documentToCompare: string, id: string, topN?: number, debug?: boolean): Promise<string[]>`
+
+Finds document IDs related to the input `documentToCompare` string. Excludes the document with the provided `id` from the results. Returns an array of related document IDs, sorted by relevance.
+
+#### `getTopTermsForId(id: string, topN?: number, debug?: boolean): Promise<{ term: string, score: number }[]>`
+
+Gets the top terms (and their scores) for a document specified by its `id`.
+
+#### `getTopRelatedDocumentsForTerm(term: string, topN?: number, debug?: boolean): Promise<string[]>`
+
+Finds document IDs related to a specific `term`. Returns an array of related document IDs, sorted by relevance.
 
 ## Development
 
