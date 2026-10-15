@@ -1,0 +1,30 @@
+---
+import type { GetStaticPaths } from "astro";
+import { getCollection, render } from "astro:content";
+import { getRelated } from "astro-relatinator";
+import Layout from "../../layouts/Layout.astro";
+
+export const getStaticPaths = (async () => {
+	const posts = await getCollection("posts");
+	return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}) satisfies GetStaticPaths;
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const related = await getRelated("posts", post, { limit: 3 });
+---
+
+<Layout title={post.data.title}>
+	<p><a href="/">All posts</a></p>
+	<article>
+		<h1>{post.data.title}</h1>
+		<p>By {post.data.author}</p>
+		<Content />
+	</article>
+	<aside>
+		<h2>Related</h2>
+		<ul id="related">
+			{related.map((entry) => <li><a href={`/posts/${entry.id}/`}>{entry.data.title}</a></li>)}
+		</ul>
+	</aside>
+</Layout>

@@ -1,26 +1,34 @@
-import pkg from "natural";
-import * as TfIdfUtils from "./tfidf";
-import * as BM25Utils from "./bm25";
-import type {
-  BM25VectorizerType,
-  RelatinatorDocument,
-  SimilarityMethod,
-} from "./types";
-
-const { TfIdf } = pkg;
-
-declare global {
-  var tfidfInstance: InstanceType<typeof TfIdf> | undefined;
-  var bm25Instance: BM25VectorizerType | undefined;
-  var relatinatorState: {
-    documentMap: Map<number, string>;
-  };
+export interface RelatinatorDocument {
+  id: string;
+  content: string;
 }
 
-globalThis.relatinatorState = {
-  documentMap: new Map(),
-};
+export type SimilarityMethod = "tfidf" | "bm25";
 
-export type { BM25VectorizerType, RelatinatorDocument, SimilarityMethod };
+export interface ModelOptions {
+  method?: SimilarityMethod;
+  bm25?: { k1?: number; b?: number };
+}
 
-export { TfIdfUtils, BM25Utils };
+export interface ScoredTerm {
+  term: string;
+  score: number;
+}
+
+export interface QueryOptions {
+  limit?: number;
+  exclude?: readonly string[];
+}
+
+export interface RelatinatorModel {
+  readonly method: SimilarityMethod;
+  readonly size: number;
+  has(id: string): boolean;
+  findRelated(id: string, options?: { limit?: number }): string[];
+  findRelatedToText(text: string, options?: QueryOptions): string[];
+  getTopTerms(id: string, limit?: number): ScoredTerm[];
+  getTopDocumentsForTerm(term: string, limit?: number): string[];
+}
+
+export { tokenize } from "./tokenize.js";
+export { createModel } from "./model.js";
