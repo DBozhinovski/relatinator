@@ -2,6 +2,13 @@
 
 All notable changes to the "astro-relatinator" project will be documented in this file.
 
+## [3.0.1] - 2026-10-15
+
+- **Fix:** The return type of `getEmDashRelated()` is now the type of the published entries. Version 3.0.0 gave the results the type of the input entry, but the results are the published entries from EmDash. Callers that gave a part of the entry data had to use a cast to read the other keys.
+- The type parameter of `getEmDashRelated()` is now `D`, the type of `data` in the published entries. The result type is `EmDashEntry<D>[]`. The entry object can have only some of the keys of `D`. When you do not give `D`, TypeScript gets it from the `data` of the entry object.
+- The `text` option gets `EmDashEntry<Partial<D>>`. It gets the published entries and, for an entry object that is not published, that object.
+- The type parameters of the exported `EmDashEntry` and `GetEmDashRelatedOptions` types changed meaning. `EmDashEntry<D>` takes the data type. `GetEmDashRelatedOptions<D>` takes the data type, not the entry type. Code that gives 3.0.0 type arguments to these types or to `getEmDashRelated()` must change. The runtime behavior does not change.
+
 ## [3.0.0] - 2026-10-15
 
 This release breaks the API. See "Migrating from 2.x" in the README.

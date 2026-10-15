@@ -160,11 +160,50 @@ const related = await getEmDashRelated("posts", post, { limit: 3 });
 </ul>
 ```
 
-The result has the same type as the entry that you give. When you give an id, the type of `entry.data` is `Record<string, unknown>`. To set a different type, use `getEmDashRelated<typeof post>("posts", "my-slug")`.
+The result contains the published entries from the collection, not copies of the entry that you give. The types are:
+
+```ts
+interface EmDashEntry<D extends object = Record<string, unknown>> {
+  readonly id: string;
+  readonly data: D;
+}
+
+function getEmDashRelated<D extends object = Record<string, unknown>>(
+  collection: string,
+  entry: string | EmDashEntry<D> | EmDashEntry<Partial<D>>,
+  options?: GetEmDashRelatedOptions<D>
+): Promise<EmDashEntry<D>[]>;
+```
+
+`D` is the type of `entry.data` in the published entries. When you give an entry object, TypeScript gets `D` from the type of its `data`. When you give an id, `D` is `Record<string, unknown>`.
+
+To set `D`, give it as a type argument. Then the entry object can have only some of the keys of `D`. The result has all of the keys of `D`, so you can map it without a cast:
+
+```ts
+interface PostData {
+  title: string;
+  excerpt: string;
+  author: string;
+  content: unknown[];
+}
+
+// Only some of the keys of PostData.
+const { title, excerpt, content } = post.data;
+const entry = { id: post.id, data: { title, excerpt, content } };
+const related = await getEmDashRelated<PostData>("posts", entry, { limit: 3 });
+
+const cards = related.map(({ id, data }) => ({
+  href: `/posts/${id}`,
+  title: data.title,
+  author: data.author,
+}));
+```
 
 ### EmDash options
 
-The options are the same as for `getRelated()`: `limit` (default `5`), `method` (default `"bm25"`), `fields`, and `text`.
+The options are the same as for `getRelated()`: `limit` (default `5`), `method` (default `"bm25"`), `fields`, and `text`. The `GetEmDashRelatedOptions<D>` type describes them.
+
+The `text` function gets each published entry. It also gets the entry object that you give when its id is not in the published entries. Thus the type of its argument is `EmDashEntry<Partial<D>>`, and each key of `entry.data` can be `undefined`.
 
 The default text of an entry has two parts:
 

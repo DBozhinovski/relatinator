@@ -118,6 +118,8 @@ The default text leaves out the keys that EmDash adds to `entry.data`. `SYSTEM_K
 
 Without this rule, the text contains the bylines and the ids, and posts by the same author look related. In the manual EmDash check, before this rule, the related list of the black-holes post showed the sourdough post.
 
+`getEmDashRelated()` returns entries from the corpus, not the entry that the page gives. Its type parameter `D` is the type of `data` in the published entries, and the result type is `EmDashEntry<D>[]`. The entry parameter is `string | EmDashEntry<D> | EmDashEntry<Partial<D>>`. With `EmDashEntry<Partial<D>>`, a page can give only some of the keys of `D`. The `EmDashEntry<D>` member accepts no other values, but it changes inference. When TypeScript gets `D` only through `Partial<D>`, it removes the `?` modifier from each key. The `text` option gets `EmDashEntry<Partial<D>>`, because it also reads the entry object of the page. Version 3.0.0 used the type of the entry object as the result type.
+
 The model contains only published entries. `rank()` in `src/emdash.ts` selects the query by the entry id. EmDash uses the slug as the entry id, with a locale prefix when i18n routing adds one. `entryIdForRow()` in the emdash 1.2.0 `loader.ts` makes this id. A draft or preview revision takes its id from the revision slug, if the revision has one.
 
 - If the id is in the model, `rank()` calls `findRelated(id)`. The query is the published text of that id. `rank()` does not read the text of the given object.
@@ -149,13 +151,13 @@ Run these commands from the repository root. The results are from 2026-10-15, wi
 
 | Command                                      | What it checks                                                                                                                                                                | Result on 2026-10-15                                     |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `pnpm test`                                  | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, and fixture posts. `astro-relatinator` tests both helpers, the text rules, and the cache. | 36 tests in `relatinator` and 43 in `astro-relatinator`. |
+| `pnpm test`                                  | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, and fixture posts. `astro-relatinator` tests both helpers, the text rules, the cache, and the types of `getEmDashRelated()`. | 36 tests in `relatinator` and 49 in `astro-relatinator`. |
 | `pnpm check`                                 | `tsc` checks the source and the tests of both libraries. `astro check` checks the playground.                                                                                 | No errors. `astro check` reports 0 errors.               |
 | `pnpm --filter relatinator test:portability` | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                     | 7303 bytes (7.1 KB), no imports.                         |
 | `pnpm build`                                 | Builds both libraries and the playground.                                                                                                                                     | The playground has 7 pages.                              |
 | `pnpm -r --if-present run format:check`      | Runs Prettier in both libraries.                                                                                                                                              | No changes. Each package prints one deprecation warning. |
 
-All 79 tests pass. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
+All 85 tests pass. The type assertions in `test/emdash-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
 
 ### Playground related lists
 
@@ -213,7 +215,6 @@ These items were open on 2026-10-15.
 - **Double build in `pnpm check`.** The `precheck` script of `astro-relatinator` builds `relatinator`. Then the `precheck` script of the playground builds `relatinator` and `astro-relatinator` again.
 - **`relatedIndex()` trusts its callers.** When `text` is set, `versionOf` must return the text that `text` returns. Both callers do this, but `relatedIndex()` does not enforce it.
 - **Two meanings of `entries`.** In `src/related-index.ts`, `Corpus.entries` is an array of entries. `RelatedIndex.entries(ids)` is a function that maps ids to entries.
-- **`ContentEntry` for EmDash.** `ContentEntry` in `src/entry-text.ts` is the type constraint of `getEmDashRelated()`. It has the optional fields `body` and `digest`, which only Astro entries have.
 - **`limit` in the shared options.** `RelatedOptions` contains `limit`, but `relatedIndex()` does not read it. `getRelated()` and `getEmDashRelated()` give `limit` to the model.
 - **Preview of a published entry.** A preview of a published entry has the id of the published entry. `getEmDashRelated()` ranks it by the published text, not by the preview text. Thus the related list does not show the effect of unpublished edits.
 - **Draft with a new slug.** If a draft revision changes the slug of a published entry, the draft id is not in the model. `getEmDashRelated()` then queries with the draft text and excludes only the new id. The published version of the same entry can then be in the results. This item comes from a code reading of `src/emdash.ts` and the emdash 1.2.0 `loader.ts`. No test or manual check covers it.

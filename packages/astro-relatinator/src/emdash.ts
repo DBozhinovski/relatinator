@@ -1,27 +1,35 @@
 import type { RelatinatorModel } from "relatinator";
 import { emdashEntryText } from "./emdash-text.js";
-import type { ContentEntry } from "./entry-text.js";
 import { portableTextToPlainText } from "./portable-text.js";
 import { relatedIndex, type RelatedOptions } from "./related-index.js";
 
 export { portableTextToPlainText };
 
-/** The entry type when `getEmDashRelated` gets an id. */
-export interface EmDashEntry {
+/**
+ * An EmDash entry. `D` is the type of `data` in the published entries
+ * of the collection.
+ */
+export interface EmDashEntry<D extends object = Record<string, unknown>> {
   readonly id: string;
-  readonly data: Record<string, unknown>;
+  readonly data: D;
 }
 
-export type GetEmDashRelatedOptions<E> = RelatedOptions<E>;
+/**
+ * `text` gets the published entries and, for an entry object that is not
+ * published, that object. Thus its data is a part of `D`.
+ */
+export type GetEmDashRelatedOptions<
+  D extends object = Record<string, unknown>,
+> = RelatedOptions<EmDashEntry<Partial<D>>>;
 
 const PAGE_SIZE = 100;
 
-async function getPublishedEntries<E extends ContentEntry>(
+async function getPublishedEntries<D extends object>(
   collection: string
-): Promise<E[]> {
+): Promise<EmDashEntry<D>[]> {
   // Imported on call so that astro.config can import this package.
   const { getEmDashCollection } = await import("emdash");
-  const entries: E[] = [];
+  const entries: EmDashEntry<D>[] = [];
   let cursor: string | undefined;
   do {
     const page = await getEmDashCollection(collection, {
@@ -35,7 +43,7 @@ async function getPublishedEntries<E extends ContentEntry>(
         { cause: page.error }
       );
     }
-    entries.push(...(page.entries as E[]));
+    entries.push(...(page.entries as EmDashEntry<D>[]));
     cursor = page.nextCursor;
   } while (cursor);
   return entries;
@@ -44,29 +52,24 @@ async function getPublishedEntries<E extends ContentEntry>(
 /**
  * Finds the published entries of an EmDash `collection` that are most
  * related to `entry`, in rank order. The model is built once and reused
- * until an entry changes.
+ * until an entry changes. `D` is the type of `data` in the published
+ * entries. An entry object can have only a part of `D`.
  */
-export function getEmDashRelated<E extends ContentEntry>(
+export async function getEmDashRelated<
+  D extends object = Record<string, unknown>,
+>(
   collection: string,
-  entry: E,
-  options?: GetEmDashRelatedOptions<E>
-): Promise<E[]>;
-export function getEmDashRelated<E extends ContentEntry = EmDashEntry>(
-  collection: string,
-  entry: string,
-  options?: GetEmDashRelatedOptions<E>
-): Promise<E[]>;
-export async function getEmDashRelated<E extends ContentEntry>(
-  collection: string,
-  entry: E | string,
-  options: GetEmDashRelatedOptions<E> = {}
-): Promise<E[]> {
+  // `EmDashEntry<D>` makes inference keep the optional keys of `D`.
+  entry: string | EmDashEntry<D> | EmDashEntry<Partial<D>>,
+  options: GetEmDashRelatedOptions<D> = {}
+): Promise<EmDashEntry<D>[]> {
   const { text, fields } = options;
-  const textOf = text ?? ((e: E) => emdashEntryText(e, fields));
-  const index = relatedIndex(
+  const textOf =
+    text ?? ((e: EmDashEntry<Partial<D>>) => emdashEntryText(e, fields));
+  const index = relatedIndex<EmDashEntry<D>>(
     {
       key: `emdash\u0000${collection}`,
-      entries: await getPublishedEntries<E>(collection),
+      entries: await getPublishedEntries<D>(collection),
       textOf,
       // EmDash keeps `updatedAt` when only the terms or bylines of an
       // entry change, so the version is the text.
@@ -79,7 +82,7 @@ export async function getEmDashRelated<E extends ContentEntry>(
   );
 }
 
-function rank<E extends ContentEntry>(
+function rank<E extends EmDashEntry<object>>(
   model: RelatinatorModel,
   collection: string,
   entry: E | string,
