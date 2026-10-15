@@ -1,44 +1,72 @@
 {
   "name": "astro-relatinator",
-  "version": "2.1.0",
-  "description": "Find related content in your Astro website or app",
+  "version": "3.0.0",
+  "description": "Find related entries in your Astro content collections",
   "author": "Darko Bozhinovski <dbozhinovski@gmail.com>",
   "license": "MIT",
   "keywords": [
     "astro",
+    "astro-integration",
+    "emdash",
     "related-content",
     "tfidf",
+    "bm25",
     "relatinator",
     "related",
     "words",
     "posts",
     "articles",
-    "static",
-    "astro-integration"
+    "static"
   ],
-  "files": [
-    "integration.ts"
-  ],
-  "exports": {
-    ".": "./integration.ts"
-  },
   "repository": {
     "type": "git",
     "url": "https://github.com/DBozhinovski/relatinator"
   },
   "type": "module",
-  "devDependencies": {
-    "@types/node": "^22.13.4",
-    "astro": ">=5",
-    "husky": "^9.1.7",
-    "vite": "^6.1.1"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./emdash": {
+      "types": "./dist/emdash.d.ts",
+      "import": "./dist/emdash.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
+    "prepack": "pnpm run build",
+    "pretest": "pnpm --filter \"astro-relatinator^...\" run build",
+    "test": "vitest run",
+    "precheck": "pnpm --filter \"astro-relatinator^...\" run build",
+    "check": "tsc --noEmit && tsc -p test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
-    "glob": "^11.0.1",
-    "gray-matter": "^4.0.3",
-    "relatinator": "workspace:*"
+    "relatinator": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "astro": "7.3.8",
+    "prettier": "^3.9.10",
+    "typescript": "6.0.3",
+    "vitest": "^5.0.4"
   },
   "peerDependencies": {
-    "astro": ">=5"
+    "astro": "^6.0.0 || ^7.0.0",
+    "emdash": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "emdash": {
+      "optional": true
+    }
   }
 }

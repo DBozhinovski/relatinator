@@ -1,22 +1,20 @@
 {
   "compilerOptions": {
-    "rootDir": ".", // Allow files at the package root
-    "target": "ESNext",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ESNext", "DOM"],
-    "moduleResolution": "Node",
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["astro/client"],
     "strict": true,
-    "sourceMap": true,
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "forceConsistentCasingInFileNames": true,
-    "types": ["vite/client", "node"]
+    "skipLibCheck": true,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "dist"
   },
-  "include": ["./"],
-  "exclude": ["**/*.test.ts", "node_modules", "test/**", ".history/**"]
+  "include": ["src"]
 }

@@ -1,23 +1,13 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
-import { getCollection } from 'astro:content';
-import { BM25Utils } from 'astro-relatinator';
+import { getCollection } from "astro:content";
+import Layout from "../layouts/Layout.astro";
 
 const posts = await getCollection("posts");
-
-console.log("posts:", posts[0].data.title);
-
-// console.log("finding posts for:", posts[0].data.title);
-const relatedPosts = await BM25Utils.findRelated(`${posts[0].data.title} ${posts[0].data.categories.join(" ")} ${posts[0].data.tags.join(" ")} ${posts[0].body}`, posts[0].id, 2);
-
-console.log("relatedPosts:", relatedPosts);
-
-// console.log(relatedPosts.map((post: any) => post.data.title));
 ---
 
-<Layout>
-	<div>
-		{ posts.map((post) => <p>{post.data.title}</p>) }
-	</div>
+<Layout title="Relatinator playground">
+	<h1>Posts</h1>
+	<ul>
+		{posts.map((post) => <li><a href={`/posts/${post.id}/`}>{post.data.title}</a></li>)}
+	</ul>
 </Layout>

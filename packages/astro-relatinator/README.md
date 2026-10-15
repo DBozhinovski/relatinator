@@ -1,88 +1,270 @@
-## Astro Integration for Relatinator
+# astro-relatinator
 
-An Astro integration for the [humble library for finding related posts and content](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator).
+Find related entries in your Astro content collections.
+
+This package wraps [relatinator](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator). It scores entries with BM25 (default) or TF-IDF.
+
+## Compatibility
+
+- Astro 6 and Astro 7. The `astro` peer dependency is `^6.0.0 || ^7.0.0`.
+- Node.js 22.12 or later.
+- Static output and on-demand rendering.
+- The Cloudflare adapter, also when the adapter prerenders pages in workerd.
+- EmDash 1.x (1.0 or later), for `astro-relatinator/emdash` only. The optional `emdash` peer dependency is `^1.0.0`.
+- ES modules only, with TypeScript type declarations.
+
+For the checks behind this list, read [Verification](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#verification).
 
 ## Installation
 
-Assuming you're running Astro v3 or later, you can install this integration by running:
-
-```
+```sh
 npx astro add astro-relatinator
 ```
 
-OR
+You can also install the package without `astro add`:
 
-```
+```sh
 npm install astro-relatinator
 ```
 
-## Configuration
+The integration is optional. `getRelated()` works without an entry in `integrations`. [How it works](#how-it-works) gives the reason. The `astro add` command adds `relatinator()` to your config. You can keep it or remove it.
 
-The integration takes four input arguments, `paths`, `schema`, `similarityMethod`, and `debug`.
+```js
+// astro.config.mjs
+import { defineConfig } from "astro/config";
+import relatinator from "astro-relatinator";
 
-- `paths` is an array of paths to the `.md` or `.mdx` files you want to use for training the model. If you're using the [Content Collections API](https://docs.astro.build/en/guides/content-collections/), you can find these at `./src/collections/<collection-name>/`.
-- `schema` is an array of frontmatter fields you want to use for training the model.
-- `similarityMethod` is the algorithm to use for training the model. Can be `"tfidf"` or `"bm25"`.
-- `debug` is a boolean flag to enable debug mode. It gets VERY verbose, so use it with caution.
-
-### Example:
-
-```ts
 export default defineConfig({
-  // ...
-  integrations: [
-    // ...
-    relatinatorIntegration({
-      paths: ["./src/content/posts"], // path yo your content files
-      schema: ["title", "descriptions", "tags"], // frontmatter fields to use for training
-      similarityMethod: "bm25", // use BM25 for training
-      debug: true, // enable debug mode
-    }),
-    // ...
-  ],
+  integrations: [relatinator()],
 });
 ```
 
-**Note:** the fields you specify in the `schema` array must be present in the frontmatter of the files you're training on. If they're not, the integration will throw an error or lead to unexpected results.
-
 ## Usage
 
-The integration hooks into the Astro build (or dev) process, and will train the model based on the files you've provided. You can then use the utility functions exported by the package (`BM25Utils` or `TfIdfUtils`, depending on your chosen `similarityMethod`) to find related content and terms.
+Call `getRelated()` in the frontmatter of a page. Give it the collection name and an entry (or the id of an entry). It returns the related entries of the same collection, most related first.
 
-### Example:
+```astro
+---
+// src/pages/posts/[id].astro
+import { getCollection, render } from "astro:content";
+import { getRelated } from "astro-relatinator";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts");
+  return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const related = await getRelated("posts", post, { limit: 3 });
+---
+
+<article>
+  <h1>{post.data.title}</h1>
+  <Content />
+</article>
+
+<h2>Related</h2>
+<ul>
+  {related.map((entry) => <li><a href={`/posts/${entry.id}/`}>{entry.data.title}</a></li>)}
+</ul>
+```
+
+The result has the same type as `getCollection("posts")`, so TypeScript knows the type of `entry.data`.
+
+`getRelated()` throws an error if the collection has no entry with the given id.
+
+## Options
+
+| Option   | Type                  | Default    | Description                                                                 |
+| -------- | --------------------- | ---------- | --------------------------------------------------------------------------- |
+| `limit`  | `number`              | `5`        | The maximum number of related entries.                                      |
+| `method` | `"bm25"` or `"tfidf"` | `"bm25"`   | The scoring method.                                                         |
+| `fields` | `readonly string[]`   | all fields | The `data` keys to read. The body is always read.                           |
+| `text`   | `(entry) => string`   | none       | A function that returns the full text of an entry. It replaces the default. |
+
+The default text of an entry has two parts:
+
+1. All string and number values in `entry.data`, also in arrays and nested objects. `getRelated()` does not read dates, booleans, or `null`. When you set `fields`, it reads only those keys.
+2. The body of the entry (`entry.body`), when the entry has one.
+
+Examples:
+
+```ts
+// Only read the title and tags, plus the body.
+await getRelated("posts", post, { fields: ["title", "tags"] });
+
+// Use your own text for each entry.
+await getRelated("posts", post, {
+  text: (entry) => `${entry.data.title} ${entry.data.tags.join(" ")}`,
+});
+```
+
+## How it works
+
+`getRelated()` reads the collection with `getCollection()` each time that a page calls it. It does not read files when Astro starts, and it does not watch files.
+
+### The model cache
+
+`getRelated()` builds one model for each combination of collection, `method`, and `fields` (or `text`). Later calls use the same model while the collection does not change. Thus a build with many pages builds each model one time.
+
+To find changes, `getRelated()` compares the id and the `digest` of each entry. Entries from the built-in loaders have a digest. If an entry has no digest, it compares the text of the entry.
+
+When you use `text`, it compares the text that your function returns. Your function runs for each entry on each call.
+
+In `astro dev`, the related entries update when you edit a content file. You do not need to restart the server.
+
+### Why the integration is optional
+
+`getRelated()` imports `astro:content`, and only Vite can resolve this module. Astro processes `astro-relatinator` with Vite because the package has an `astro` peer dependency, the `astro` keyword, and a name that starts with `astro-`. Thus `getRelated()` works with or without the integration. For the details, read [The integration is optional](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#the-integration-is-optional).
+
+## Limitations
+
+- With on-demand rendering, each Node.js process or Cloudflare Workers isolate builds its own model on the first call. The cache is in memory. A new process or isolate starts with an empty cache.
+- Each call reads the whole collection. With `text`, and on EmDash, each call also makes the text of every entry to find changes. The time for a call and for a model build grows with the size of the collection.
+- The cache keeps a model for each set of options that your pages use. It does not remove models.
+- The related entries come from the collection that you give. `getRelated()` does not compare entries across collections.
+- `getEmDashRelated()` ranks only published entries. [Which entries are compared](#which-entries-are-compared) tells how it uses a draft or a preview.
+- The tokenizer is for English text. [How scoring works](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#how-scoring-works) gives the steps.
+
+## EmDash
+
+[EmDash](https://github.com/emdash-cms/emdash) keeps content in a database, not in content collections. For EmDash sites, use `getEmDashRelated()` from `astro-relatinator/emdash`. It uses the same scoring and the same model cache as `getRelated()`.
+
+It needs `emdash` 1.x (1.0 or later). Install the package next to `emdash`:
+
+```sh
+npm install astro-relatinator
+```
+
+You do not need the integration in `astro.config.mjs`.
+
+### Usage
+
+Give `getEmDashRelated()` the collection slug and an entry (or the id of an entry). It returns the related entries, most related first.
+
+```astro
+---
+// src/pages/posts/[slug].astro
+import { getEmDashEntry } from "emdash";
+import { getEmDashRelated } from "astro-relatinator/emdash";
+
+const { entry: post } = await getEmDashEntry("posts", Astro.params.slug);
+if (!post) return Astro.redirect("/404");
+
+const related = await getEmDashRelated("posts", post, { limit: 3 });
+---
+
+<ul>
+  {related.map((entry) => <li><a href={`/posts/${entry.id}`}>{entry.data.title}</a></li>)}
+</ul>
+```
+
+The result has the same type as the entry that you give. When you give an id, the type of `entry.data` is `Record<string, unknown>`. To set a different type, use `getEmDashRelated<typeof post>("posts", "my-slug")`.
+
+### EmDash options
+
+The options are the same as for `getRelated()`: `limit` (default `5`), `method` (default `"bm25"`), `fields`, and `text`.
+
+The default text of an entry has two parts:
+
+1. The string and number values of the content fields in `entry.data`. A Portable Text value becomes plain text. The plain text contains the text of each block, without keys, styles, and marks. It does not contain other block types, such as images.
+2. The labels of the taxonomy terms of the entry, such as tag and category names.
+
+The default text does not include the values that EmDash adds to each entry. These are `id`, `slug`, `status`, `authorId`, `primaryBylineId`, `createdAt`, `updatedAt`, `publishedAt`, `scheduledAt`, `draftRevisionId`, `liveRevisionId`, `locale`, `translationGroup`, `byline`, `bylines`, and `seo`. The default text also leaves out term ids and term slugs.
+
+When you set `fields`, the default text reads only those keys. It reads all of the values in those keys, including EmDash system values and all of the properties of terms. Portable Text in those keys still becomes plain text. When you set `text`, your function gives all of the text.
+
+```ts
+// Only read the title, the excerpt, and the content.
+await getEmDashRelated("posts", post, {
+  fields: ["title", "excerpt", "content"],
+});
+```
+
+To convert Portable Text in your own `text` function, use `portableTextToPlainText()`:
+
+```ts
+import {
+  getEmDashRelated,
+  portableTextToPlainText,
+} from "astro-relatinator/emdash";
+
+await getEmDashRelated("posts", post, {
+  text: (entry) =>
+    `${entry.data.title} ${portableTextToPlainText(entry.data.content)}`,
+});
+```
+
+### Which entries are compared
+
+The model contains only the published entries of the collection. `getEmDashRelated()` reads all pages of the collection with `getEmDashCollection()`.
+
+EmDash uses the slug of an entry as its id. Thus a preview of a published entry has the id of the published entry, unless the draft changes the slug.
+
+- If you give the id of an entry that is not published, `getEmDashRelated()` throws an error.
+- If you give an entry object whose id is in the published entries, `getEmDashRelated()` uses the published text of that id. It does not read the text of the object. For a preview of a published entry, the related entries come from the published text, not from the preview text.
+- If you give an entry object whose id is not in the published entries, `getEmDashRelated()` uses the text of the object. An example is a draft of an entry that was never published. The result does not contain that id.
+- If EmDash returns an error, `getEmDashRelated()` throws an error that names the collection.
+
+### Caching on servers and Workers
+
+EmDash sites render on request. `getEmDashRelated()` reads the collection on each call. It keeps the model until an entry changes. To find changes, it compares the id and the text of each entry. [Limitations](#limitations) tells how the cache works on Node.js servers and on Cloudflare Workers.
+
+## Migrating from 2.x
+
+Version 3.0 removes the old API. Make these changes:
+
+1. Remove all options from `relatinator()` in your Astro config. In a type-checked config (`astro.config.ts`, or a file with `// @ts-check`), the 2.x options cause a type error. In a config without type checks, version 3.0 ignores the options and logs a warning. You can also remove the integration.
+2. Remove `BM25Utils` and `TfIdfUtils` from your pages. Call `getRelated()` instead.
+3. Use entry ids, not titles. Version 2.x used the `title` frontmatter field as the id. `getRelated()` uses `entry.id` and returns entries.
+4. Replace `schema` with `fields`. Replace `similarityMethod` with `method`. The `paths` option has no replacement, because `getRelated()` reads the collection with `getCollection()`.
+5. Note the new default method. Version 2.x used TF-IDF by default. Version 3.0 uses BM25. Set `method: "tfidf"` to keep the old method.
+
+In version 2.x, `findRelated` returns the `title` frontmatter field of each related entry, not the entry id. Thus a lookup by `post.id` finds no entries. This 2.x example finds the entries by title:
 
 ```astro
 ---
 import { getCollection } from "astro:content";
-// Import the utils corresponding to your configured similarityMethod
-// (BM25Utils in this example, matching the config example above)
 import { BM25Utils } from "astro-relatinator";
 
-const blogEntries = await getCollection("posts"); // assuming your collection is called posts
-// let's say we want to compare against the first blog entry
-const first = blogEntries[0];
-
-// Concatenate the same fields we used for training and declare how many related posts we want to find
-const related = await BM25Utils.findRelated(`${first.data.title} ${first.data.description} ${first.data.tags.join(' ')} ${first.body}`, first.id, 3)
-
+const posts = await getCollection("posts");
+const post = posts[0];
+// 2.x returns frontmatter titles, not entry ids.
+const titles = await BM25Utils.findRelated(`${post.data.title} ${post.body}`, post.data.title, 3);
+const related = titles.map((title) => posts.find((p) => p.data.title === title));
 ---
-
-<div>
-<!-- render your related posts here -->
-{ related.map((id) => {
-  const post = blogEntries.find((post) => post.id === id);
-  if (!post) return null; // Handle case where post might not be found
-  return (
-    <a href={`/posts/${post.slug}/`}> {/* Adjust href based on your routing */}
-      <h2>{post.data.title}</h2>
-      <p>{post.data.description}</p>
-    </a>
-  );
-}) }
-</div>
-
 ```
 
-**Note:** The `BM25Utils` and `TfIdfUtils` objects also provide `getTopTermsForId` and `getTopRelatedDocumentsForTerm` functions, similar to the core `relatinator` library.
+In version 3.0, one call replaces this code:
 
-**Development Server:** When running `astro dev`, the integration uses debouncing (a small delay) before re-training the model after a markdown file change. This improves performance for larger sites by preventing rapid, successive re-trains during saves.
+```astro
+---
+import { getCollection } from "astro:content";
+import { getRelated } from "astro-relatinator";
+
+const posts = await getCollection("posts");
+const related = await getRelated("posts", posts[0], { limit: 3 });
+---
+```
+
+## Development
+
+This package is part of a pnpm workspace. For the workspace commands, read [Development](https://github.com/DBozhinovski/relatinator#development) in the repository README. For the design decisions and the verification, read [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md).
+
+Run these commands from the repository root:
+
+| Command                                        | What it does                                                                                                                 |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter astro-relatinator build`        | Deletes `dist` and compiles `src` with `tsc`.                                                                                |
+| `pnpm --filter astro-relatinator test`         | Builds `relatinator` in `pretest`. Then it runs the Vitest tests. The tests replace `astro:content` and `emdash` with stubs. |
+| `pnpm --filter astro-relatinator check`        | Builds `relatinator` in `precheck`. Then it type-checks `src` and `test` with `tsc`.                                         |
+| `pnpm --filter astro-relatinator format:check` | Checks the format with Prettier. `format` writes the changes.                                                                |
+
+The tests do not run Astro. To test a change in a real Astro site, build the playground and compare its [expected related lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/playground#expected-related-lists).
+
+The `prepack` script runs `build`. Thus `pnpm pack` and `pnpm publish` always include a new build.
+
+## License
+
+MIT
