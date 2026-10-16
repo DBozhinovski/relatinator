@@ -43,6 +43,28 @@ describe("relatedIndex", () => {
     expect(rebuilt.model.findRelated("b")).toEqual(["c"]);
   });
 
+  it("rebuilds the model when separator characters shift between entries", () => {
+    const byText = (entries: { id: string; data: object }[]) => {
+      const base = corpus("separators", entries);
+      return { ...base, versionOf: base.textOf };
+    };
+    const one = relatedIndex(
+      byText([{ id: "a", data: { text: "x\u0001b\u0000y" } }]),
+      {}
+    );
+    const two = relatedIndex(
+      byText([
+        { id: "a", data: { text: "x" } },
+        { id: "b", data: { text: "y" } },
+      ]),
+      {}
+    );
+
+    expect(one.model.has("b")).toBe(false);
+    expect(two.model.has("b")).toBe(true);
+    expect(two.model.size).toBe(2);
+  });
+
   it("keeps a model per key and option set", () => {
     const bm25 = relatedIndex(corpus("options", pets("cats nap")), {});
     const tfidf = relatedIndex(corpus("options", pets("cats nap")), {

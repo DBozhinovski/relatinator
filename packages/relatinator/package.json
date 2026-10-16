@@ -15,7 +15,7 @@
     "articles",
     "static"
   ],
-  "version": "3.0.0",
+  "version": "3.1.0",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -35,6 +35,7 @@
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
     "prepack": "pnpm run build",
     "test": "vitest run",
+    "bench": "pnpm run build && node bench/bench.mjs",
     "test:portability": "pnpm run build && node scripts/check-portability.js",
     "check": "tsc --noEmit && tsc -p test",
     "format": "prettier --write .",
@@ -48,6 +49,7 @@
     "esbuild": "^0.28.2",
     "gray-matter": "^4.0.3",
     "prettier": "^3.9.10",
+    "relatinator-reference": "npm:relatinator@3.0.0",
     "typescript": "6.0.3",
     "vitest": "^5.0.4"
   }

@@ -77,6 +77,9 @@ importers:
       prettier:
         specifier: ^3.9.10
         version: 3.9.10
+      relatinator-reference:
+        specifier: npm:relatinator@3.0.0
+        version: relatinator@3.0.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1760,6 +1763,10 @@ packages:
 
   regex@6.1.0:
     resolution: {integrity: sha512-6VwtthbV4o/7+OaAF9I5L5V3llLEsoPyq9P1JVXkedTP33c7MfCG0/5NOPcSJn0TzXcG9YUrR0gQSWioew3LDg==}
+
+  relatinator@3.0.0:
+    resolution: {integrity: sha512-t7Crb4G1b8Zb84wrA0vJ34Vy359P2Arq7vneFzeAB4h/bW9j8ox1ZnJFNg8WMnJlYQRBfcyKgVHzvf63iVX+Hg==}
+    engines: {node: '>=22.12'}
 
   request-light@0.5.8:
     resolution: {integrity: sha512-3Zjgh+8b5fhRJBQZoy+zbVKpAQGLyka0MPgW3zruTF4dFFJ8Fqcfu9YsAvi/rvdcaTeWG3MkbZv4WKxAn/84Lg==}
@@ -3951,6 +3958,10 @@ snapshots:
   regex@6.1.0:
     dependencies:
       regex-utilities: 2.3.0
+
+  relatinator@3.0.0:
+    dependencies:
+      wink-porter2-stemmer: 2.0.1
 
   request-light@0.5.8: {}
 

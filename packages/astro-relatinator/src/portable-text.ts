@@ -5,11 +5,11 @@ interface PortableTextBlock {
 
 function blockText({ _type, children }: PortableTextBlock): string | undefined {
   if (_type !== "block" || !Array.isArray(children)) return undefined;
-  return children
-    .map((span: { text?: unknown }) =>
-      typeof span?.text === "string" ? span.text : ""
-    )
-    .join("");
+  let text = "";
+  for (const span of children) {
+    if (typeof span?.text === "string") text += span.text;
+  }
+  return text;
 }
 
 /**
@@ -20,10 +20,13 @@ function blockText({ _type, children }: PortableTextBlock): string | undefined {
 export function portableTextToPlainText(value: unknown): string {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
-  return value
-    .map((block: PortableTextBlock) => blockText(block ?? {}))
-    .filter((text) => text !== undefined)
-    .join("\n");
+  let text: string | undefined;
+  for (const block of value) {
+    const line = blockText(block ?? {});
+    if (line !== undefined)
+      text = text === undefined ? line : `${text}\n${line}`;
+  }
+  return text ?? "";
 }
 
 /** The plain text of a Portable Text value, or `undefined` for other values. */

@@ -250,6 +250,8 @@ EmDash uses the slug of an entry as its id. Thus a preview of a published entry 
 
 EmDash sites render on request. `getEmDashRelated()` reads the collection on each call. It keeps the model until an entry changes. To find changes, it compares the id and the text of each entry. [Limitations](#limitations) tells how the cache works on Node.js servers and on Cloudflare Workers.
 
+For the measured time of a call with and without a cached model, read the [3.1.0 changelog](https://github.com/DBozhinovski/relatinator/blob/master/packages/astro-relatinator/CHANGELOG.md#310---2026-10-16).
+
 ## Migrating from 2.x
 
 Version 3.0 removes the old API. Make these changes:
@@ -293,12 +295,13 @@ This package is part of a pnpm workspace. For the workspace commands, read [Deve
 
 Run these commands from the repository root:
 
-| Command                                        | What it does                                                                                                                 |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm --filter astro-relatinator build`        | Deletes `dist` and compiles `src` with `tsc`.                                                                                |
-| `pnpm --filter astro-relatinator test`         | Builds `relatinator` in `pretest`. Then it runs the Vitest tests. The tests replace `astro:content` and `emdash` with stubs. |
-| `pnpm --filter astro-relatinator check`        | Builds `relatinator` in `precheck`. Then it type-checks `src` and `test` with `tsc`.                                         |
-| `pnpm --filter astro-relatinator format:check` | Checks the format with Prettier. `format` writes the changes.                                                                |
+| Command                                        | What it does                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter astro-relatinator build`        | Deletes `dist` and compiles `src` with `tsc`.                                                                                                                                                                                                                                                                                            |
+| `pnpm --filter astro-relatinator test`         | Builds `relatinator` in `pretest`. Then it runs the Vitest tests. The tests replace `astro:content` and `emdash` with stubs.                                                                                                                                                                                                             |
+| `pnpm --filter astro-relatinator check`        | Builds `relatinator` in `precheck`. Then it type-checks `src` and `test` with `tsc`.                                                                                                                                                                                                                                                     |
+| `pnpm --filter astro-relatinator format:check` | Checks the format with Prettier. `format` writes the changes.                                                                                                                                                                                                                                                                            |
+| `pnpm --filter astro-relatinator bench`        | Builds `relatinator` and this package. Then it times `getEmDashRelated()` and `getRelated()` on synthetic posts in memory, without Astro and without a database. `--size` sets the number of posts (default `1005`). `--runs` sets the number of runs (default `5`). `--dist` sets the `dist` directory to time (default: this package). |
 
 The tests do not run Astro. To test a change in a real Astro site, build the playground and compare its [expected related lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/playground#expected-related-lists).
 

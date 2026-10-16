@@ -47,12 +47,9 @@ export function relatedIndex<E extends ContentEntry>(
   { method = "bm25", fields, text }: RelatedOptions<E>
 ): RelatedIndex<E> {
   const source = text ? `text:${text}` : `fields:${JSON.stringify(fields)}`;
-  const fingerprint = entries
-    .map((entry) => `${entry.id}\u0000${versionOf(entry)}`)
-    .join("\u0001");
   const model = getCachedModel(
     `${key}\u0000${method}\u0000${source}`,
-    fingerprint,
+    entries.flatMap((entry) => [`${entry.id}`, `${versionOf(entry)}`]),
     () =>
       createModel(
         entries.map((entry) => ({ id: entry.id, content: textOf(entry) })),

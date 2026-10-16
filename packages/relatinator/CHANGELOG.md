@@ -2,6 +2,29 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
+## [3.1.0] - 2026-10-16
+
+This release makes the library faster. The API, the options, and the defaults do not change. The results, the tie order, and the scores are the same as in 3.0.0.
+
+- **Perf:** `createModel()` makes an inverted index. For each term, the index lists the documents with the term and the weight of the term in each document. `createModel()` calculates each weight one time. A query adds the weights only for the documents that contain a query term. Version 3.0.0 calculated the weight of each query term for each document on each query.
+- **Perf:** For an integer `limit` from 0 to 64, a query keeps only the best `limit` documents while it ranks. For other `limit` values, it sorts all documents, as version 3.0.0 did.
+- **Perf:** `tokenize()` stems each different word one time. It keeps up to 100,000 stems in memory. When the cache is full, `tokenize()` clears it.
+- The minified bundle of `dist/index.js` is 8787 bytes. In version 3.0.0, it was 7303 bytes.
+- Nine `method` values are names of `Object.prototype` methods: `"constructor"`, `"toString"`, `"valueOf"`, `"hasOwnProperty"`, `"isPrototypeOf"`, `"propertyIsEnumerable"`, `"toLocaleString"`, `"__lookupGetter__"`, and `"__lookupSetter__"`. These values are not valid methods, and TypeScript rejects them. For these 9 values, `createModel()` now throws `TypeError: weightings[method] is not a function`. Each other invalid value, such as `"foo"`, throws the same error, as in version 3.0.0. For the 9 values, version 3.0.0 returned a model. Then a query that weighed a term threw `TypeError: weight is not a function`. The other queries returned `[]`.
+- For the `method` values `"__defineGetter__"` and `"__defineSetter__"`, `createModel()` throws a `TypeError` in both versions, but the message changes. It is now `weightings[method] is not a function`. Version 3.0.0 gave `Object.prototype.__defineGetter__: Expecting function` (or `__defineSetter__`). TypeScript rejects these values too.
+
+This table gives the times for 1,005 synthetic posts with a mean of 1,204 words. All queries use `limit: 5`. Each value is the median of 5 runs, with the range in parentheses.
+
+| Operation                                           | 3.0.0                     | 3.1.0                     |
+| --------------------------------------------------- | ------------------------- | ------------------------- |
+| `createModel()`                                     | 2.12 s (2.08 to 2.13 s)   | 0.34 s (0.33 to 0.37 s)   |
+| `createModel()`, then `findRelated()` for each post | 25.8 s (25.6 to 25.9 s)   | 0.45 s (0.43 to 0.49 s)   |
+| `tokenize()` for each post                          | 1.98 s (1.95 to 1.99 s)   | 0.29 s (0.27 to 0.30 s)   |
+| One `findRelated()` call                            | 23.2 ms (22.2 to 23.3 ms) | 0.12 ms (0.11 to 0.17 ms) |
+| One `findRelatedToText()` call                      | 25.0 ms (24.3 to 25.4 ms) | 0.38 ms (0.35 to 0.45 ms) |
+
+The command was `pnpm --filter relatinator bench --impl both --sizes 1005`, on 2026-10-16. It ran with Node.js 24.13.1 on one core of an AMD Ryzen AI 9 HX 370 (`taskset -c 3`). Each run starts a new Node.js process. The outputs of both versions had the same checksums, and no call failed. In version 3.1.0, `tokenize()` takes most of the time of `createModel()`.
+
 ## [3.0.0] - 2026-10-15
 
 This release changes the API. See "Migrating from 2.x" in the README.
