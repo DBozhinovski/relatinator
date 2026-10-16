@@ -25,18 +25,29 @@ const SYSTEM_KEYS = new Set([
 ]);
 
 function termLabels(terms: unknown): string[] {
-  if (typeof terms !== "object" || terms === null) return [];
-  return Object.values(terms)
-    .flat()
-    .map((term: { label?: unknown }) => term?.label)
-    .filter((label) => typeof label === "string");
+  const labels: string[] = [];
+  const add = (term: { label?: unknown } | null | undefined) => {
+    const label = term?.label;
+    if (typeof label === "string") labels.push(label);
+  };
+  if (typeof terms !== "object" || terms === null) return labels;
+  for (const group of Object.values(terms)) {
+    // Like `flat()`: one level deep, without the holes.
+    if (Array.isArray(group)) group.forEach(add);
+    else add(group);
+  }
+  return labels;
 }
 
 function contentData(data: object): Record<string, unknown> {
-  const content = Object.fromEntries(
-    Object.entries(data).filter(([key]) => !SYSTEM_KEYS.has(key))
-  );
-  return { ...content, terms: termLabels((data as { terms?: unknown }).terms) };
+  // No prototype, so a "__proto__" key is copied as data.
+  const content: Record<string, unknown> = Object.create(null);
+  for (const key of Object.keys(data)) {
+    if (!SYSTEM_KEYS.has(key))
+      content[key] = (data as Record<string, unknown>)[key];
+  }
+  content.terms = termLabels((data as { terms?: unknown }).terms);
+  return content;
 }
 
 /**

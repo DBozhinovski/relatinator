@@ -15,8 +15,8 @@ describe("getCachedModel", () => {
       return createModel(docs);
     };
 
-    const first = getCachedModel("same", "v1", build);
-    const second = getCachedModel("same", "v1", build);
+    const first = getCachedModel("same", ["v1"], build);
+    const second = getCachedModel("same", ["v1"], build);
 
     expect(builds).toBe(1);
     expect(second).toBe(first);
@@ -24,11 +24,11 @@ describe("getCachedModel", () => {
   });
 
   it("rebuilds and replaces the entry when the fingerprint changes", () => {
-    const v1 = getCachedModel("changing", "v1", () => createModel(docs));
-    const v2 = getCachedModel("changing", "v2", () =>
+    const v1 = getCachedModel("changing", ["v1"], () => createModel(docs));
+    const v2 = getCachedModel("changing", ["v2"], () =>
       createModel([...docs, { id: "c", content: "pears only" }])
     );
-    const v2Again = getCachedModel("changing", "v2", () => createModel([]));
+    const v2Again = getCachedModel("changing", ["v2"], () => createModel([]));
 
     expect(v2).not.toBe(v1);
     expect(v2Again).toBe(v2);
@@ -36,8 +36,8 @@ describe("getCachedModel", () => {
   });
 
   it("keeps models for different keys apart", () => {
-    const left = getCachedModel("left", "v1", () => createModel(docs));
-    const right = getCachedModel("right", "v1", () =>
+    const left = getCachedModel("left", ["v1"], () => createModel(docs));
+    const right = getCachedModel("right", ["v1"], () =>
       createModel([{ id: "z", content: "zebra" }])
     );
 

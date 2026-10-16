@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createModel } from "../src/index.js";
+import type { SimilarityMethod } from "../src/index.js";
 
 const languages = [
   { id: "node", content: "this document is about node." },
@@ -191,5 +192,44 @@ describe("corpus validation", () => {
     expect(model.size).toBe(0);
     expect(model.findRelatedToText("anything")).toEqual([]);
     expect(model.getTopDocumentsForTerm("anything")).toEqual([]);
+  });
+
+  const invalidMethods = [
+    "constructor",
+    "toString",
+    "valueOf",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "propertyIsEnumerable",
+    "toLocaleString",
+    "__lookupGetter__",
+    "__lookupSetter__",
+    "__defineGetter__",
+    "__defineSetter__",
+    "__proto__",
+    "foo",
+  ];
+  const corpora = {
+    "with terms": languages,
+    "without terms": [
+      { id: "a", content: "" },
+      { id: "b", content: "the and of" },
+    ],
+  };
+
+  describe.each(Object.entries(corpora))("on a corpus %s", (_, docs) => {
+    it.each(invalidMethods)("rejects the method %j", (method) => {
+      const options = { method: method as SimilarityMethod };
+      let thrown: unknown;
+      try {
+        createModel(docs, options);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(TypeError);
+      expect((thrown as TypeError).message).toBe(
+        "weightings[method] is not a function"
+      );
+    });
   });
 });

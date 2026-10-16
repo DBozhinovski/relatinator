@@ -30,7 +30,7 @@ Some rows have automated checks in this repository. Other rows had a one-time ma
 
 ## Development
 
-This repository is a pnpm workspace. You need Node.js 22.12 or later and pnpm. The commands below work with Node.js 24.13.1 and pnpm 11.24.0, the versions of the last check on 2026-10-15.
+This repository is a pnpm workspace. You need Node.js 22.12 or later and pnpm. The commands below work with Node.js 24.13.1 and pnpm 11.24.0, the versions of the last check on 2026-10-16.
 
 Run these commands from the repository root:
 

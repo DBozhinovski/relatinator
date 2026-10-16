@@ -3,7 +3,7 @@
 Relatinator finds related documents. It ranks documents with BM25 or TF-IDF.
 
 - It has one runtime dependency: a Porter2 stemmer.
-- All functions are synchronous and pure. The library keeps no global state.
+- All functions are synchronous and pure. The library keeps no global state except a bounded stem cache. This cache does not change any result.
 
 ## Compatibility
 
@@ -112,13 +112,14 @@ This package is part of a pnpm workspace. For the workspace commands, read [Deve
 
 Run these commands from the repository root:
 
-| Command                                      | What it does                                                                                                                                                      |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm --filter relatinator build`            | Deletes `dist` and compiles `src` with `tsc`.                                                                                                                     |
-| `pnpm --filter relatinator test`             | Runs the Vitest tests. The tests import `src`, so you do not have to build first.                                                                                 |
-| `pnpm --filter relatinator check`            | Type-checks `src`, `test`, and `scripts` with `tsc`.                                                                                                              |
-| `pnpm --filter relatinator test:portability` | Builds the package and bundles `dist/index.js` for a neutral platform. It fails if the bundle keeps an import, such as a Node.js module, or is larger than 60 KB. |
-| `pnpm --filter relatinator format:check`     | Checks the format with Prettier. `format` writes the changes.                                                                                                     |
+| Command                                      | What it does                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm --filter relatinator build`            | Deletes `dist` and compiles `src` with `tsc`.                                                                                                                                                                                                                                                                                                                            |
+| `pnpm --filter relatinator test`             | Runs the Vitest tests. The tests import `src`, so you do not have to build first.                                                                                                                                                                                                                                                                                        |
+| `pnpm --filter relatinator check`            | Type-checks `src`, `test`, and `scripts` with `tsc`.                                                                                                                                                                                                                                                                                                                     |
+| `pnpm --filter relatinator test:portability` | Builds the package and bundles `dist/index.js` for a neutral platform. It fails if the bundle keeps an import, such as a Node.js module, or is larger than 60 KB.                                                                                                                                                                                                        |
+| `pnpm --filter relatinator format:check`     | Checks the format with Prettier. `format` writes the changes.                                                                                                                                                                                                                                                                                                            |
+| `pnpm --filter relatinator bench`            | Builds the package. Then it times `createModel()`, the queries, and `tokenize()` on synthetic posts. Each run starts a new Node.js process. `--impl both` also times `relatinator` 3.0.0 and compares the checksums of the outputs. `--sizes` sets the numbers of posts, as a comma-separated list (default `200,1005`). `--runs` sets the number of runs (default `5`). |
 
 The `prepack` script runs `build`. Thus `pnpm pack` and `pnpm publish` always include a new build.
 
