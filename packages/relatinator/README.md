@@ -1,6 +1,6 @@
 # Relatinator
 
-Relatinator finds related documents. It ranks documents with BM25 or TF-IDF.
+Relatinator finds related documents. It ranks documents with BM25 or TF-IDF. It can also choose topics for a text from a fixed list.
 
 - It has one runtime dependency: a Porter2 stemmer.
 - All functions are synchronous and pure. The library keeps no global state except a bounded stem cache. This cache does not change any result.
@@ -37,6 +37,22 @@ model.findRelatedToText("A quiet cat", { limit: 2 }); // ["cats", "both"]
 model.findRelatedToText("pets", { exclude: ["both"] }); // ["cats", "dogs"]
 model.getTopTerms("dogs", 3); // [{ term: "long", score: 0.96 }, ...]
 model.getTopDocumentsForTerm("walking"); // ["dogs"]
+```
+
+To choose topics from a fixed list, give each topic a tag and an optional description:
+
+```ts
+import { classify } from "relatinator";
+
+const topics = [
+  { tag: "community", description: "meetups, conferences, user groups" },
+  { tag: "frontend", description: "HTML, CSS, components, accessibility" },
+  { tag: "backend", description: "APIs, databases, servers, hosting" },
+  { tag: "astro" },
+];
+
+classify(topics, "How we built the meetup website with Astro and CSS");
+// [{ tag: "astro", score: 1 }, { tag: "community", score: 0.63 }, { tag: "frontend", score: 0.63 }]
 ```
 
 Each model is a separate value. To change the corpus, create a new model.
@@ -79,6 +95,67 @@ tokenize("The cats aren't sleeping"); // ["cat", "sleep"]
 
 Terms are stems, not words. Thus `getTopTerms` can return `"exampl"` for "examples".
 
+### `classify(topics, text, options?)`
+
+Chooses topics for `text` from a fixed list. Returns an array of `{ tag, score }` in rank order.
+
+- `topics` is an array of `{ tag: string; description?: string }`. Each `tag` must be unique. A duplicate `tag` throws `Duplicate topic tag: "<tag>"`.
+- `options.ratio` is a number from 0 to 1 (default `0.5`). Other values throw a `RangeError`.
+- `options.limit` is the maximum number of topics (default `3`). It follows the same rules as the `limit` of `findRelatedToText`.
+
+The best topic has the score 1. If no topic shares a term with `text`, the result is `[]`. [How scoring works](#how-scoring-works) gives the rules.
+
+A topic without a description matches only through the words of its tag. The topic list controls most of the result. [Best practices for topic lists](#best-practices-for-topic-lists) tells you how to write it.
+
+The score is relative to the other topics for the same text, so do not compare scores of different texts. A BM25 score grows with the length of the text. Thus a fixed minimum score keeps too many topics for a long text and too few for a short one.
+
+`classify` does not read your tagged posts. It uses only the topic list. Thus it has the same cost for a new site and for a site with many posts.
+
+## Best practices for topic lists
+
+`classify` matches words, not meanings. Thus the words in your topic list control most of the result. In a test with 38 blog posts, specific descriptions gave much better results than short, general ones. The code and the posts were the same. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-fixed-list-scored-by-their-descriptions) gives the numbers.
+
+### Write the descriptions
+
+- **Name the specific things that your posts mention.** Use the names of projects, tools, products, events, and places. For example, write "self-hosting with Coolify and Hetzner, serverless functions, edge computing". Do not write only "hosting".
+- **Use the words of your posts.** `classify` matches "PWA" to "PWA", but not to "progressive web app". If your posts use both forms, put both in the description.
+- **Write 10 to 25 words for each topic.** Keep the descriptions at a similar length. A topic with a much longer text matches more posts.
+- **Leave out the words that most of your posts contain.** For example, "JavaScript" in one description on a JavaScript blog makes that topic match almost every post.
+
+### Choose the topics
+
+- **Make each topic group several posts.** Three separate topic lists for one blog with 38 posts had 11 to 14 topics.
+- **Do not make a topic that fits almost every post.** For example, "web development" on a web development blog groups nothing. Its words also match every text.
+- **Make the topics different from each other.** If two topics share most of their words, `classify` gives them together. Merge them, or keep only the words that make them different.
+
+### Check the result
+
+1. Run `classify` on 10 to 20 of your posts.
+2. Read the topics that it gives each post.
+3. If a topic is on a post that is not about it, compare `tokenize(description)` with `tokenize(post)`. Remove the shared word that causes the match.
+4. If a topic is missing from a post, add a word from that post to the description.
+5. Do steps 1 to 4 again until most posts get the correct topics.
+
+To get fewer topics with more correct ones, increase `ratio`. In the test, `ratio` 0.7 kept about 75% correct topics and found about 60% of the correct topics. `ratio` 0.5 gave about 70% for both.
+
+### Start with no tags
+
+`relatinator` cannot make the topic list for you. In the test, topics made from the words of the posts were mostly noise. Use one of these methods:
+
+- Write the list yourself from the subjects of your posts.
+- Give your posts to a language model one time, and ask it for a list. Then edit the list. After that, `classify` runs without the model.
+
+This prompt gives a list in the correct format:
+
+```text
+Read these blog posts. Propose 8 to 15 topics that a reader can use to browse
+the blog. Each topic must group several posts. Do not make a topic that fits
+almost every post. For each topic, give a lowercase kebab-case tag and a
+description of 10 to 25 words. In the description, name the projects, tools,
+products, and events that the posts mention. Use the words of the posts.
+Return JSON: [{ "tag": "...", "description": "..." }]
+```
+
 ## How scoring works
 
 The model scores documents in four steps.
@@ -91,6 +168,13 @@ The model scores documents in four steps.
 4. **Rank.** The model removes the query document and the ids in `exclude`. It also removes each document with a score of 0. A document that shares no term with the query has a score of 0. It sorts the other documents by score, highest first. Documents with equal scores keep their input order. The result is the first `limit` ids.
 
 `getTopTerms` sorts the terms of a document by weight, highest first. Terms with equal weights are in JavaScript string order.
+
+`classify(topics, text)` uses the same steps, with BM25 and the default `k1` and `b`. It has these differences:
+
+1. The documents are the topics. The text of a topic is its tag, followed by its description if there is one. The id is the tag.
+2. The query is `tokenize(text)`.
+3. It divides the score of each topic by the best score. Thus the best topic has the score 1.
+4. It removes each topic with a score of 0 or a score below `ratio`. It sorts the other topics as in step 4. The result is the first `limit` topics, as `{ tag, score }`.
 
 ## Migrating from 2.x
 
