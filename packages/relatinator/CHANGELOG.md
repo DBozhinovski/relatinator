@@ -2,6 +2,15 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
+## [3.2.0] - 2026-10-17
+
+This release adds `classify()`. The other functions do not change.
+
+- **New:** `classify(topics, text, { ratio, limit })` chooses topics for a text from a fixed list. Each topic is a tag with an optional description. The function scores the text against each tag and description with BM25. It returns `{ tag, score }[]`, where the best topic has the score 1. The defaults are `ratio: 0.5` and `limit: 3`. See [issue #6](https://github.com/DBozhinovski/relatinator/issues/6).
+- **Docs:** The README has a new section, "Best practices for topic lists". It tells you how to write the descriptions, choose the topics, check the result, and start a list for a site with no tags.
+- `createModel()` and the queries give the same results, the same tie order, and the same scores as in 3.1.0. The equivalence test with 3.0.0 passes without changes.
+- The minified bundle of `dist/index.js` is 9499 bytes. In version 3.1.0, it was 8787 bytes.
+
 ## [3.1.0] - 2026-10-16
 
 This release makes the library faster. The API, the options, and the defaults do not change. The results, the tie order, and the scores are the same as in 3.0.0.

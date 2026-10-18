@@ -212,20 +212,23 @@ function byScoreThenTerm(a: ScoredTerm, b: ScoredTerm): number {
   return b.score - a.score || (a.term < b.term ? -1 : a.term > b.term ? 1 : 0);
 }
 
-export function createModel(
-  documents: readonly RelatinatorDocument[],
-  options: ModelOptions = {}
-): RelatinatorModel {
-  const method = options.method ?? "bm25";
-  const corpus = indexCorpus(documents);
-  const weightFor = weightings[method](corpus, options.bm25 ?? {});
-  const { offsets, indices, weights } = buildPostings(corpus, weightFor);
+/** Per-document score totals of queries against one indexed corpus. */
+export interface Scorer {
+  readonly corpus: Corpus;
+  readonly weightFor: TermWeight;
+  score(query: TermCounts): Float64Array;
+  queryOf(tokens: readonly string[]): TermCounts;
+  scoreText(text: string): Float64Array;
+}
 
-  const lookup = (id: string): IndexedDocument => {
-    const doc = corpus.byId.get(id);
-    if (doc === undefined) throw new Error(`Unknown document id: "${id}"`);
-    return doc;
-  };
+export function createScorer(
+  documents: readonly RelatinatorDocument[],
+  method: SimilarityMethod,
+  bm25: Bm25Options
+): Scorer {
+  const corpus = indexCorpus(documents);
+  const weightFor = weightings[method](corpus, bm25);
+  const { offsets, indices, weights } = buildPostings(corpus, weightFor);
 
   // Each document sums its terms in query order, as 3.0.0 did, so the floating
   // point totals are identical. Documents without a query term stay at 0.
@@ -252,18 +255,39 @@ export function createModel(
   };
 
   return {
+    corpus,
+    weightFor,
+    score,
+    queryOf,
+    scoreText: (text) => score(queryOf(tokenize(text))),
+  };
+}
+
+export function createModel(
+  documents: readonly RelatinatorDocument[],
+  options: ModelOptions = {}
+): RelatinatorModel {
+  const method = options.method ?? "bm25";
+  const { corpus, weightFor, score, queryOf, scoreText } = createScorer(
+    documents,
+    method,
+    options.bm25 ?? {}
+  );
+
+  const lookup = (id: string): IndexedDocument => {
+    const doc = corpus.byId.get(id);
+    if (doc === undefined) throw new Error(`Unknown document id: "${id}"`);
+    return doc;
+  };
+
+  return {
     method,
     size: corpus.documents.length,
     has: (id) => corpus.byId.has(id),
     findRelated: (id, { limit = DEFAULT_LIMIT } = {}) =>
       rank(corpus.documents, score(lookup(id)), limit, new Set([id])),
     findRelatedToText: (text, { limit = DEFAULT_LIMIT, exclude = [] } = {}) =>
-      rank(
-        corpus.documents,
-        score(queryOf(tokenize(text))),
-        limit,
-        new Set(exclude)
-      ),
+      rank(corpus.documents, scoreText(text), limit, new Set(exclude)),
     getTopTerms: (id, limit = DEFAULT_LIMIT) => {
       const doc = lookup(id);
       return doc.terms

@@ -10,15 +10,16 @@ This document is for maintainers. It gives the reasons for the 3.x design, the c
 
 `relatinator` is the scoring library. It has no framework code.
 
-| File                           | Contents                                                                                                                    |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `src/index.ts`                 | The public types. It exports `createModel()` and `tokenize()`.                                                              |
-| `src/tokenize.ts`              | `tokenize()`. It removes elisions, splits words, removes stopwords, and stems each word. It keeps a cache of stems.         |
-| `src/stopwords.ts`             | The English stopword list.                                                                                                  |
-| `src/model.ts`                 | `createModel()`. It indexes the documents, weighs the terms, and ranks the results.                                         |
-| `scripts/check-portability.js` | The portability check. [Automated checks](#automated-checks) describes it.                                                  |
-| `bench/bench.mjs`              | The benchmark. [Automated checks](#automated-checks) describes it.                                                          |
-| `bench/corpus.js`              | The synthetic posts of the benchmarks and of `test/equivalence.test.ts`. The same size and seed always give the same posts. |
+| File                           | Contents                                                                                                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                 | The public types. It exports `createModel()`, `classify()`, and `tokenize()`.                                                                                                       |
+| `src/tokenize.ts`              | `tokenize()`. It removes elisions, splits words, removes stopwords, and stems each word. It keeps a cache of stems.                                                                 |
+| `src/stopwords.ts`             | The English stopword list.                                                                                                                                                          |
+| `src/model.ts`                 | `createModel()`. It indexes the documents, weighs the terms, and ranks the results. `createScorer()` makes the index and scores queries. `createModel()` and `classify()` share it. |
+| `src/classify.ts`              | `classify()`. It scores a text against a fixed topic list with `createScorer()`.                                                                                                    |
+| `scripts/check-portability.js` | The portability check. [Automated checks](#automated-checks) describes it.                                                                                                          |
+| `bench/bench.mjs`              | The benchmark. [Automated checks](#automated-checks) describes it.                                                                                                                  |
+| `bench/corpus.js`              | The synthetic posts of the benchmarks and of `test/equivalence.test.ts`. The same size and seed always give the same posts.                                                         |
 
 `astro-relatinator` reads entries, makes the text of each entry, and gives the text to `relatinator`.
 
@@ -52,7 +53,7 @@ Version 2.x used `natural` for TF-IDF, and `wink-nlp` with the `wink-eng-lite-we
 
 Version 3.0 has its own tokenizer and its own TF-IDF and BM25 code. The only runtime dependency is `wink-porter2-stemmer`. `src/stopwords.ts` is a copy of the English stopword list of `wink-nlp-utils` 2.1.0. The copy leaves out the entries with an apostrophe. These entries can never match a token, because `tokenize()` splits words at apostrophes.
 
-The minified bundle of `dist/index.js` is 8.6 KB and has no imports. It does not import Node.js modules, so it runs in browsers and in Workers. The portability check enforces this.
+The minified bundle of `dist/index.js` is 9.3 KB and has no imports. It does not import Node.js modules, so it runs in browsers and in Workers. The portability check enforces this.
 
 The tokenizer steps, the formulas, and the ranking rules have one home, [How scoring works](../packages/relatinator/README.md#how-scoring-works) in the `relatinator` README. `test/model.test.ts` compares the weights with hand-computed values. `test/fixtures.test.ts` checks that the TF-IDF top terms of a fixture post are the same as in 2.x.
 
@@ -175,6 +176,37 @@ Three checks enforce the rule:
 
 After these changes, `tokenize()` takes most of the build time. In the benchmark on 2026-10-16, `tokenize()` for 1,005 posts took 0.29 s, and `createModel()` took 0.34 s. Thus a faster build needs a faster `tokenize()`.
 
+### Topics from a fixed list, scored by their descriptions
+
+`classify()` chooses topics from a list that a person writes. It does not make new tags. [Issue #6](https://github.com/DBozhinovski/relatinator/issues/6) gives the reasons. In short, tags made from the words of a post were rare words or noise, and they repeated what related posts already do.
+
+Each topic is one BM25 document with the tag and the description. `classify()` uses `createScorer()` from `src/model.ts`, so it has no second BM25 formula. The design differs from the first sketch in issue #6 in two ways. An eval on 2026-10-17 showed the need for both changes:
+
+- **No posts in the topic documents.** The sketch added all posts with the topic to the topic document. Then the topic with the longest text won. In the eval, one topic had 13,881 tokens and was first for 15 of 37 posts, but only 6 posts had it. With posts in the documents, the descriptions changed 1 of 63 labels.
+- **A relative cut, not a minimum score.** A BM25 score is a sum over the terms of the query, so it grows with the length of the text. In the eval, the best score went from 16 for a post with 130 characters to 1,883 for a post with 42,767 characters. With a fixed `minScore` from 5 to 80, the precision stayed at 0.16 to 0.17. `classify()` divides each score by the best score and keeps the topics at `ratio` or more.
+
+The eval used the 37 posts of darko.io and 11 topics with 63 labels that a person approved. Two language models wrote the descriptions from the topic names only, without the posts. With `ratio` 0.5 and `limit` 3, the precision was 0.70 and 0.73, and the recall was 0.70 and 0.71. Without descriptions, the precision was 0.73 and the recall was 0.52. The first sketch, with the best 2 topics of each post, gave a precision of 0.58 and a recall of 0.68.
+
+The eval also added a vote of the 3 nearest tagged posts to the description score. With the best 2 topics of each post, the vote found 3 to 5 more correct labels of 63. With `ratio` 0.5, it found 8 to 10 more, but the precision fell. Without the vote, the precision was 0.67 to 0.73. With the vote, it was 0.58 to 0.61. The vote also needs all tagged posts for each call, so `classify()` does not have it.
+
+A second test on 2026-10-18 measured the effect of the topic list. Two language models, Claude and GPT, each read 38 posts without the 63 labels. The 38 posts were the 37 posts of darko.io and 1 post of blog.wts.sh. Each model made its own topic list with 13 or 14 topics and tagged the posts. Pair F1 compares two tag sets with different topic lists. It counts the pairs of posts that share a topic in both sets.
+
+| Tag sets                                           | Pair F1 |
+| -------------------------------------------------- | ------- |
+| The 63 labels and Claude                           | 0.65    |
+| The 63 labels and GPT                              | 0.67    |
+| Claude and GPT                                     | 0.79    |
+| `classify()` with the first topic list and GPT     | 0.47    |
+| `classify()` with the Claude topic list and GPT    | 0.71    |
+| `classify()` with the Claude topic list and Claude | 0.70    |
+
+With the Claude topic list, `classify()` agreed with GPT as well as two taggers agree with each other. Against the Claude labels, the precision and the recall were both 0.79. The Claude descriptions named the projects, tools, and events of the posts, such as "BeerJS Skopje" and "Coolify and Hetzner". The first descriptions had general words. The README section "Best practices for topic lists" comes from this result.
+
+Two other methods did not help, and `relatinator` does not have them:
+
+- **Pseudo-relevance feedback.** This method added the top terms of the posts that matched a topic best to its description. The mean F1 was 0.67 without it and 0.54 to 0.68 with it. The feedback posts were often wrong, and the top terms of a post were words of that post only.
+- **A part-of-speech filter.** A filter with the compromise library kept only nouns. It made topics from the words of the posts better, from a mean best F1 of 0.68 to 0.73. But it adds 120 KB (gzipped) and works only with English.
+
 ## Verification
 
 This section lists the checks behind the claims in the READMEs. There are two types of checks:
@@ -184,14 +216,14 @@ This section lists the checks behind the claims in the READMEs. There are two ty
 
 ### Automated checks
 
-Run these commands from the repository root. The results are from 2026-10-16, with Node.js 24.13.1 and pnpm 11.24.0.
+Run these commands from the repository root. The results are from 2026-10-16, with Node.js 24.13.1 and pnpm 11.24.0. A result that gives another date is from that date.
 
 | Command                                                    | What it checks                                                                                                                                                                                                                                                                                                                                                   | Result on 2026-10-16                                                                                                                                                                                                |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests both helpers, the text rules, the cache, and the types of `getEmDashRelated()`.                                                                                                                     | 125 tests in `relatinator` and 50 in `astro-relatinator`.                                                                                                                                                           |
+| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests both helpers, the text rules, the cache, and the types of `getEmDashRelated()`.                                                                                                       | 144 tests in `relatinator` and 50 in `astro-relatinator` on 2026-10-17. `test/classify.test.ts` has 19 of them.                                                                                                     |
 | `pnpm --filter relatinator test equivalence`               | Runs only `test/equivalence.test.ts`. It compares the results, the scores, the tie order, and the errors of `src` with `relatinator` 3.0.0. The inputs are synthetic corpora, the fixture posts, the playground posts, seven option sets, `limit` values next to 64, odd `limit` values, more than 100,000 different words, and strings with Unicode edge cases. | 63 tests.                                                                                                                                                                                                           |
 | `pnpm check`                                               | `tsc` checks the source and the tests of both libraries. `astro check` checks the playground.                                                                                                                                                                                                                                                                    | No errors. `astro check` reports 0 errors.                                                                                                                                                                          |
-| `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                        | 8787 bytes (8.6 KB), no imports.                                                                                                                                                                                    |
+| `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                        | 9499 bytes (9.3 KB), no imports, on 2026-10-17.                                                                                                                                                                     |
 | `pnpm build`                                               | Builds both libraries and the playground.                                                                                                                                                                                                                                                                                                                        | The playground has 7 pages.                                                                                                                                                                                         |
 | `pnpm -r --if-present run format:check`                    | Runs Prettier in both libraries.                                                                                                                                                                                                                                                                                                                                 | No changes. Each package prints one deprecation warning.                                                                                                                                                            |
 | `pnpm --filter relatinator bench --impl both --sizes 1005` | Builds `relatinator`. Then it times the model build, the queries, and `tokenize()` of 3.1 and 3.0.0 on 1,005 synthetic posts, in 5 runs. Each run starts a new Node.js process. The last line tells if the output checksums of all runs agree.                                                                                                                   | The checksums agree, and no call failed. The [3.1.0 changelog](../packages/relatinator/CHANGELOG.md#310---2026-10-16) gives the times.                                                                              |
@@ -199,7 +231,7 @@ Run these commands from the repository root. The results are from 2026-10-16, wi
 
 The benchmark times depend on the machine and its load. For the results above, `taskset -c 3` kept each benchmark on one CPU core.
 
-All 175 tests pass. The type assertions in `test/emdash-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
+All 194 tests pass. The type assertions in `test/emdash-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
 
 ### Playground related lists
 
@@ -256,7 +288,7 @@ These checks compared version 3.1 with `relatinator` 3.0.0 and `astro-relatinato
 
 ## Known gaps and follow-ups
 
-These items were open on 2026-10-16.
+These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17.
 
 - **Astro 6 in the repository.** All workspace packages use Astro 7.3.8. Only the manual consumer build used Astro 6.4.8.
 - **Lowest supported versions.** No check covers the lowest versions of the supported ranges. All checks ran on Node.js 24.13.1, not on Node.js 22.12. The Astro checks used 6.4.8 and 7.3.8, not 6.0 and 7.0. The EmDash check used 1.2.0, not 1.0. For emdash 1.0.0, only the result type of `getEmDashCollection()` was read.
@@ -276,4 +308,7 @@ These items were open on 2026-10-16.
 - **Warm EmDash calls.** Each `getEmDashRelated()` call makes the text of every entry, because the cache uses the text as the version. The freshness rule needs this text, so a call with a cached model cannot skip it. This text takes most of the time of such a call. The [3.1.0 changelog](../packages/astro-relatinator/CHANGELOG.md#310---2026-10-16) gives the times.
 - **Benchmark data.** Both benchmarks use the synthetic posts of `bench/corpus.js`. The helper benchmark reads in-memory collections, not a database, and it does not run Astro. Thus its times do not include a database read or a page render.
 - **3.0 manual checks on the 3.1 code.** The consumer builds, the Cloudflare check, and the EmDash check ran on the 3.0 code. They did not run on the 3.1 code.
+- **`classify()` defaults.** The defaults `ratio` 0.5 and `limit` 3 come from the eval of 37 posts. The same posts chose them and measured them. No second corpus checks them. The test on 2026-10-18 added one post and two more taggers, but no new corpus. Its taggers were language models, not people. The eval scripts are not in the repository.
+- **Posts that match no topic.** Issue #6 asks for a list of the posts that match no topic. A relative cut gives each text with a matching term at least one topic. Thus `classify()` cannot give this list. It needs a different signal.
+- **Topics in `astro-relatinator`.** `astro-relatinator` has no topic option, and EmDash terms are not topics yet. Issue #6 describes both.
 - **Native EmDash plugins.** How a page can read the data of a native EmDash plugin is an open question upstream. Until EmDash answers it, the site helper is the supported design.

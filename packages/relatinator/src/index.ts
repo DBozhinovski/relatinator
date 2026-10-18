@@ -30,5 +30,21 @@ export interface RelatinatorModel {
   getTopDocumentsForTerm(term: string, limit?: number): string[];
 }
 
+export interface Topic {
+  tag: string;
+  description?: string;
+}
+
+export interface ClassifyOptions {
+  ratio?: number;
+  limit?: number;
+}
+
+export interface ScoredTopic {
+  tag: string;
+  score: number;
+}
+
 export { tokenize } from "./tokenize.js";
 export { createModel } from "./model.js";
+export { classify } from "./classify.js";
