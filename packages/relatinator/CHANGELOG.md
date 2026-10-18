@@ -2,7 +2,7 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
-## [3.2.0] - 2026-10-17
+## [3.2.0] - 2026-10-18
 
 This release adds `classify()`. The other functions do not change.
 
