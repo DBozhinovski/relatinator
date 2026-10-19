@@ -11,6 +11,7 @@ This package wraps [relatinator](https://github.com/DBozhinovski/relatinator/tre
 - Static output and on-demand rendering.
 - The Cloudflare adapter, also when the adapter prerenders pages in workerd.
 - EmDash 1.x (1.0 or later), for `astro-relatinator/emdash` only. The optional `emdash` peer dependency is `^1.0.0`.
+- EmDash 1.3.1 or later, for the `astro-relatinator/emdash-plugin` plugin. The checks used EmDash 1.3.1 only.
 - ES modules only, with TypeScript type declarations.
 
 For the checks behind this list, read [Verification](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#verification).
@@ -251,6 +252,79 @@ EmDash uses the slug of an entry as its id. Thus a preview of a published entry 
 EmDash sites render on request. `getEmDashRelated()` reads the collection on each call. It keeps the model until an entry changes. To find changes, it compares the id and the text of each entry. [Limitations](#limitations) tells how the cache works on Node.js servers and on Cloudflare Workers.
 
 For the measured time of a call with and without a cached model, read the [3.1.0 changelog](https://github.com/DBozhinovski/relatinator/blob/master/packages/astro-relatinator/CHANGELOG.md#310---2026-10-16).
+
+## EmDash topic suggestions
+
+`astro-relatinator/emdash-plugin` is an EmDash plugin. It adds a "Suggested topics" panel to the entry editor. The panel suggests terms from the taxonomies of the collection, such as categories and tags. The user selects the terms to add. The plugin does not add a term without the user.
+
+The panel scores the terms with `classify()` from [`relatinator`](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#classifytopics-text-options). Each term is a topic. The tag of the topic is the term slug. The description of the topic is the term label and the term description.
+
+### Install the plugin
+
+The plugin needs `emdash` 1.3.1 or later. Install the package next to `emdash`:
+
+```sh
+npm install astro-relatinator
+```
+
+Add the plugin to `plugins` in the EmDash integration:
+
+```js
+// astro.config.mjs
+import emdash from "emdash/astro";
+import relatinatorTopics from "astro-relatinator/emdash-plugin";
+
+export default defineConfig({
+  integrations: [
+    emdash({
+      // database, storage, and other options
+      plugins: [relatinatorTopics()],
+    }),
+  ],
+});
+```
+
+To show the panel only in some collections, give their slugs:
+
+```js
+relatinatorTopics({ collections: ["posts"] });
+```
+
+The plugin asks for the `content:read` and `taxonomies:write` capabilities. Users with the `content:edit_own` permission can use the panel. In EmDash 1.3.1, the Author role and the roles above it have this permission. Contributors have only `content:edit_own_drafts`, so they cannot use the panel. EmDash also checks that the user can edit that entry.
+
+### What users see
+
+The panel shows one group of check boxes for each taxonomy of the collection. Each suggested term shows its score as a percent of the best score in its taxonomy. The panel does not suggest a term that the entry already has. It shows the assigned terms in a line below the suggestions.
+
+1. Open a saved entry in the editor.
+2. In "Suggested topics", select the terms to add.
+3. Click "Add selected terms". The panel adds the terms. Then the admin loads the entry page again, so the taxonomy fields show the new terms.
+
+The panel shows a message in these conditions:
+
+- The collection has no taxonomy.
+- The taxonomies have no terms.
+- No term matches the saved text of the entry.
+
+When a term has no description, the panel shows "Descriptions improve suggestions".
+
+### Write term descriptions
+
+A term without a description matches only through its slug and its label. To get better suggestions, give each term a description in the EmDash admin. Write the names of the specific things that your entries mention, such as projects, tools, places, and events. Use 10 to 25 words. [Best practices for topic lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#best-practices-for-topic-lists) tells you how to write them.
+
+### How the panel gets the text
+
+The text of the entry is the [default EmDash text](#emdash-options), without the labels of the assigned terms. Otherwise, each assigned term matches its own label and gets the best score. Then the other terms fall below the cut.
+
+`classify()` runs one time for each taxonomy, with its defaults: `ratio` 0.5 and `limit` 3. Thus each taxonomy gets at most 3 suggestions, before the panel removes the assigned terms. The panel reads the terms in the locale of the entry.
+
+### Limits of the panel
+
+- The panel reads the saved entry. It does not read the changes that are not saved in the editor.
+- After the panel adds terms, the admin loads the entry page again. This reload loses the changes that the editor did not save yet. The editor saves changes automatically after a short time. Wait until the Save button shows "Saved" before you add terms.
+- The plugin runs in `plugins: []` only. EmDash reads the entry file of a plugin in `sandboxed: []` as one module, and this entry file imports other modules. Thus the plugin does not load in the sandbox.
+- The panel does not make new terms. It suggests only the terms that exist.
+- The tokenizer is for English text.
 
 ## Migrating from 2.x
 

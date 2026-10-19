@@ -2,6 +2,13 @@
 
 All notable changes to the "astro-relatinator" project will be documented in this file.
 
+## Unreleased
+
+- **New:** The new `astro-relatinator/emdash-plugin` entry point is an EmDash plugin. It adds a "Suggested topics" panel to the entry editor. The panel suggests terms from the taxonomies of the collection with `classify()`. The user selects the terms, and the panel adds them to the entry. [EmDash topic suggestions](README.md#emdash-topic-suggestions) tells how to install it.
+- The plugin uses the standard EmDash plugin format. It runs in `plugins: []`. It does not run in `sandboxed: []` yet.
+- The plugin needs `classify()`, so the `relatinator` dependency is now `^3.2.0`.
+- The new `astro-relatinator/emdash-plugin/sandbox` entry point is the plugin code that EmDash loads. Do not import it in your pages.
+
 ## [3.1.0] - 2026-10-16
 
 This release makes the helpers faster. The API does not change. The related entries, their order, and the default text are the same as in 3.0.1.

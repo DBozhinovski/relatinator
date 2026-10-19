@@ -23,19 +23,22 @@ This document is for maintainers. It gives the reasons for the 3.x design, the c
 
 `astro-relatinator` reads entries, makes the text of each entry, and gives the text to `relatinator`.
 
-| File                   | Contents                                                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `src/get-related.ts`   | `getRelated()` for Astro content collections.                                                                                   |
-| `src/emdash.ts`        | `getEmDashRelated()` for EmDash collections. This file is the `astro-relatinator/emdash` entry point.                           |
-| `src/related-index.ts` | `relatedIndex()`, which both helpers call. It makes the cache key and the fingerprint, gets the model, and maps ids to entries. |
-| `src/model-cache.ts`   | `getCachedModel()`. It keeps one model for each cache key.                                                                      |
-| `src/entry-text.ts`    | The default text of an Astro entry, and the `ContentEntry` type.                                                                |
-| `src/emdash-text.ts`   | The default text of an EmDash entry.                                                                                            |
-| `src/portable-text.ts` | `portableTextToPlainText()`.                                                                                                    |
-| `src/integration.ts`   | The optional Astro integration. It only warns about 2.x options.                                                                |
-| `bench/bench.mjs`      | The benchmark of both helpers. [Automated checks](#automated-checks) describes it.                                              |
-| `bench/hooks.mjs`      | A module hook for the benchmark. It loads `bench/store.mjs` in place of `emdash` and `astro:content`.                           |
-| `bench/store.mjs`      | The in-memory collections of the benchmark.                                                                                     |
+| File                         | Contents                                                                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `src/get-related.ts`         | `getRelated()` for Astro content collections.                                                                                   |
+| `src/emdash.ts`              | `getEmDashRelated()` for EmDash collections. This file is the `astro-relatinator/emdash` entry point.                           |
+| `src/related-index.ts`       | `relatedIndex()`, which both helpers call. It makes the cache key and the fingerprint, gets the model, and maps ids to entries. |
+| `src/model-cache.ts`         | `getCachedModel()`. It keeps one model for each cache key.                                                                      |
+| `src/entry-text.ts`          | The default text of an Astro entry, and the `ContentEntry` type.                                                                |
+| `src/emdash-text.ts`         | The default text of an EmDash entry.                                                                                            |
+| `src/portable-text.ts`       | `portableTextToPlainText()`.                                                                                                    |
+| `src/emdash-topics.ts`       | `suggestTerms()` and `topicText()`. They score the terms of EmDash taxonomies with `classify()`. They do not import `emdash`.   |
+| `src/emdash-plugin.ts`       | The plugin descriptor. This file is the `astro-relatinator/emdash-plugin` entry point.                                          |
+| `src/emdash-plugin-entry.ts` | The route of the "Suggested topics" editor panel. This file is the `astro-relatinator/emdash-plugin/sandbox` entry point.       |
+| `src/integration.ts`         | The optional Astro integration. It only warns about 2.x options.                                                                |
+| `bench/bench.mjs`            | The benchmark of both helpers. [Automated checks](#automated-checks) describes it.                                              |
+| `bench/hooks.mjs`            | A module hook for the benchmark. It loads `bench/store.mjs` in place of `emdash` and `astro:content`.                           |
+| `bench/store.mjs`            | The in-memory collections of the benchmark.                                                                                     |
 
 ## Design decisions
 
@@ -207,12 +210,32 @@ Two other methods did not help, and `relatinator` does not have them:
 - **Pseudo-relevance feedback.** This method added the top terms of the posts that matched a topic best to its description. The mean F1 was 0.67 without it and 0.54 to 0.68 with it. The feedback posts were often wrong, and the top terms of a post were words of that post only.
 - **A part-of-speech filter.** A filter with the compromise library kept only nouns. It made topics from the words of the posts better, from a mean best F1 of 0.68 to 0.73. But it adds 120 KB (gzipped) and works only with English.
 
+### EmDash terms as topics, in an editor panel
+
+The `astro-relatinator/emdash-plugin` plugin suggests taxonomy terms for a saved entry. It closes the item "EmDash terms are not topics yet" of [issue #6](https://github.com/DBozhinovski/relatinator/issues/6). It does not change the site helper. [EmDash support is a site helper, not a plugin](#emdash-support-is-a-site-helper-not-a-plugin) still applies to related content.
+
+The plugin is different from related content in three ways. It reads one entry and the terms of its taxonomies, not the whole collection. It writes only when a user selects terms. Its result is for the user, not for a page of the site.
+
+**The standard format.** The descriptor sets `format: "standard"`. The entry file default-exports `{ routes }`, and EmDash calls each route with `(routeCtx, ctx)`. emdash 1.3.1 accepts a standard plugin in `plugins: []` and in `sandboxed: []`. A native plugin can run only in `plugins: []`. A standard plugin cannot get options from the descriptor. The `options` field of `PluginDescriptor` is for native plugins only. Thus the only option is `collections`, which goes into the descriptor itself.
+
+The plugin runs only in `plugins: []` now. For `sandboxed: []`, EmDash reads the entry file with `readFileSync()` and loads the code as one module (emdash 1.3.1 `virtual-modules.ts`). The `tsc` output of the entry file imports `relatinator` and other files of the package. A sandboxed entry needs a bundle with no imports. The official plugins build this bundle with `@emdash-cms/plugin-cli`.
+
+**The route permission.** A route without a permission requires `plugins:manage`. The panel route sets `content:edit_own`, so the users with this permission can use it. Contributors have only `content:edit_own_drafts` and cannot use it. EmDash then checks that the user can edit the entry (`requireOwnerPerm()` in `http-route-dispatch.ts`). The permission is in two places. The entry route has it for `plugins: []`, and the descriptor `routes` list has it for `sandboxed: []`.
+
+The route reads the entry from `routeCtx.ui.entry`. EmDash sets this value only for a request through the editor panel endpoint, after the checks. A direct call to the plugin route has no `ui.entry`, and the route returns status 400. The route also does not trust the submitted term ids. It adds only the ids that are terms of that taxonomy and that the entry does not have yet.
+
+**Tag = slug.** Each term becomes one topic. The tag is the term slug. EmDash keeps the slug unique for each taxonomy and locale, but two terms can have the same label. `classify()` throws an error for two equal tags, so the label cannot be the tag. The description is the label and `data.description`, because the label is the best short description of a term. `classify()` runs one time for each taxonomy. Thus the same slug in two taxonomies does not give equal tags, and the relative cut compares only the terms of one taxonomy.
+
+**No labels of the assigned terms in the text.** The default EmDash text contains the labels of the terms of the entry. [EmDash support is a site helper, not a plugin](#emdash-support-is-a-site-helper-not-a-plugin) gives the reason. For suggestions, these labels are wrong. Each assigned term matches its own label and can get the best score. The relative cut then removes the other terms, and the panel removes the assigned term. The result is no suggestion. `topicText()` removes `terms` from the data before it makes the default text. In emdash 1.3.1, `ctx.content.get()` does not put `terms` into the data. The rule keeps the text correct if a later EmDash version adds it.
+
+The assigned terms stay in the `classify()` call. The panel removes them from the result. Thus the cut is the same as for an entry without terms, and an assigned term can use one of the 3 places of `limit`.
+
 ## Verification
 
 This section lists the checks behind the claims in the READMEs. There are two types of checks:
 
 - Automated checks are scripts in this repository. No CI runs them. Run them by hand before a release.
-- Manual checks ran one time, during the 3.0 work on 2026-10-15 and during the 3.1 work on 2026-10-16. The repository has no scripts for them. The procedures below repeat the consumer builds, the Cloudflare check, and the EmDash check. The negative control, the 2.x baseline, and the 3.1 checks have no written procedure.
+- Manual checks ran one time, during the 3.0 work on 2026-10-15, during the 3.1 work on 2026-10-16, and during the topic plugin work on 2026-10-19. The repository has no scripts for them. The procedures below repeat the consumer builds, the Cloudflare check, and the EmDash check. The negative control, the 2.x baseline, the 3.1 checks, and the topic plugin checks have no written procedure.
 
 ### Automated checks
 
@@ -220,7 +243,7 @@ Run these commands from the repository root. The results are from 2026-10-16, wi
 
 | Command                                                    | What it checks                                                                                                                                                                                                                                                                                                                                                   | Result on 2026-10-16                                                                                                                                                                                                |
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests both helpers, the text rules, the cache, and the types of `getEmDashRelated()`.                                                                                                       | 144 tests in `relatinator` and 50 in `astro-relatinator` on 2026-10-17. `test/classify.test.ts` has 19 of them.                                                                                                     |
+| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests both helpers, the text rules, the cache, the types of `getEmDashRelated()`, and the topic plugin.                                                                                     | 144 tests in `relatinator` and 66 in `astro-relatinator` on 2026-10-19. `test/classify.test.ts` has 19 of them.                                                                                                     |
 | `pnpm --filter relatinator test equivalence`               | Runs only `test/equivalence.test.ts`. It compares the results, the scores, the tie order, and the errors of `src` with `relatinator` 3.0.0. The inputs are synthetic corpora, the fixture posts, the playground posts, seven option sets, `limit` values next to 64, odd `limit` values, more than 100,000 different words, and strings with Unicode edge cases. | 63 tests.                                                                                                                                                                                                           |
 | `pnpm check`                                               | `tsc` checks the source and the tests of both libraries. `astro check` checks the playground.                                                                                                                                                                                                                                                                    | No errors. `astro check` reports 0 errors.                                                                                                                                                                          |
 | `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                        | 9499 bytes (9.3 KB), no imports, on 2026-10-17.                                                                                                                                                                     |
@@ -231,7 +254,7 @@ Run these commands from the repository root. The results are from 2026-10-16, wi
 
 The benchmark times depend on the machine and its load. For the results above, `taskset -c 3` kept each benchmark on one CPU core.
 
-All 194 tests pass. The type assertions in `test/emdash-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
+All 210 tests pass on 2026-10-19. The type assertions in `test/emdash-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
 
 ### Playground related lists
 
@@ -286,9 +309,26 @@ These checks compared version 3.1 with `relatinator` 3.0.0 and `astro-relatinato
 | Text. The inputs are random EmDash and Astro entries, also entries with odd shapes. The check compares the outputs and the errors of the text functions with 3.0.1.                                                                                                                                               | 0 differences in 1,000,000 comparisons.              |
 | Cache. The check makes 40,000 random changes to a collection. One half of the run also uses ids and texts with U+0000 and U+0001. The check compares each decision to build a new model with 3.0.1.                                                                                                               | 0 differences.                                       |
 
+### Manual check of the topic plugin
+
+This check ran on 2026-10-19. It used `npm create emdash@1.3.1` with the `node:blog` template, `emdash` 1.3.1, Astro 7.4.0, and the packed tarballs of `relatinator` 3.2.0 and `astro-relatinator`. The config had `plugins: [relatinatorTopics()]`. After the dev-bypass setup, the check called the panel endpoint `POST /_emdash/api/content/posts/{id}/plugin-extensions/relatinator-topics/panel/suggested-topics` with the session cookie and the `X-EmDash-Request: 1` header.
+
+- The manifest listed the "Suggested topics" panel.
+- `panel_load` gave the expected blocks for each of the 8 seeded posts. Three posts got suggestions, and five posts got "No suggestions". The seed terms have no descriptions, so each response had the description hint.
+- `form_submit` with one suggested tag added that tag to the entry. The response had the toast "Added 1 term." and the new blocks. The terms API of the entry then listed the new tag.
+- A request without the header got status 403. A request without the cookie got status 401. A direct call to `/_emdash/api/plugins/relatinator-topics/panel` got status 400.
+
+A second check on the same day drove the admin UI in Chromium with Playwright:
+
+- The "Suggested topics" panel showed in the sidebar of the post editor. It listed "Design (100%)" under Categories and "Tools (100%)" under Tags. A click on "Add selected terms" added the selected term and showed the toast.
+- With `refresh: true`, the Categories field of the editor did not show the new term. emdash 1.3.1 `handlePluginEntryRefresh` in the admin reloads the `content`, `revisions`, and `translations` queries, but not the `entry-terms` queries of that field. The field saves its whole list. A removal of the old term in the field then removed the new term too. The terms API showed no categories after that removal.
+- The panel now returns `navigate` to the same entry instead of `refresh`. The admin then loads the page again with `window.location.assign()`. After the add, the Categories field showed both terms. A removal of the old term kept the new term.
+- An edit of the post title saved automatically within 3 seconds. The Save button then showed "Saved".
+- The browser console showed a React warning that a `form` is inside a `form`. The admin puts the Block Kit form of the panel inside the editor form. The submit of the panel did not submit the editor form.
+
 ## Known gaps and follow-ups
 
-These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17.
+These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17. The topic plugin items were open on 2026-10-19.
 
 - **Astro 6 in the repository.** All workspace packages use Astro 7.3.8. Only the manual consumer build used Astro 6.4.8.
 - **Lowest supported versions.** No check covers the lowest versions of the supported ranges. All checks ran on Node.js 24.13.1, not on Node.js 22.12. The Astro checks used 6.4.8 and 7.3.8, not 6.0 and 7.0. The EmDash check used 1.2.0, not 1.0. For emdash 1.0.0, only the result type of `getEmDashCollection()` was read.
@@ -310,5 +350,11 @@ These items were open on 2026-10-16. The three `classify()` items were open on 2
 - **3.0 manual checks on the 3.1 code.** The consumer builds, the Cloudflare check, and the EmDash check ran on the 3.0 code. They did not run on the 3.1 code.
 - **`classify()` defaults.** The defaults `ratio` 0.5 and `limit` 3 come from the eval of 37 posts. The same posts chose them and measured them. No second corpus checks them. The test on 2026-10-18 added one post and two more taggers, but no new corpus. Its taggers were language models, not people. The eval scripts are not in the repository.
 - **Posts that match no topic.** Issue #6 asks for a list of the posts that match no topic. A relative cut gives each text with a matching term at least one topic. Thus `classify()` cannot give this list. It needs a different signal.
-- **Topics in `astro-relatinator`.** `astro-relatinator` has no topic option, and EmDash terms are not topics yet. Issue #6 describes both.
+- **Topics in `astro-relatinator`.** `astro-relatinator` has no topic option for Astro content collections. Issue #6 describes it. Since the topic plugin, EmDash terms are topics in the entry editor. [EmDash terms as topics, in an editor panel](#emdash-terms-as-topics-in-an-editor-panel) describes it.
+- **The topic plugin in the sandbox.** The plugin does not load in `sandboxed: []`, because its entry file is not one bundle with no imports. The build uses only `tsc`. A fix needs a bundle step for `dist/emdash-plugin-entry.js`. No test runs the plugin in workerd. `@emdash-cms/plugin-test` 0.2.10 needs Vitest 4, `@cloudflare/vitest-plugin`, and a build with `@emdash-cms/plugin-cli`. The package uses Vitest 5.
+- **The text of the topic panel.** The panel reads the data that `ctx.content.get()` returns. In emdash 1.3.1, this data comes from the stored columns of the entry (`ContentRepository.findById()`), not from a revision. A code reading did not find if an unpublished draft revision of a published entry changes these columns. No check covers an entry with a draft revision.
+- **Unsaved changes in the topic panel.** The panel reads the saved content of the entry, not the changes that are not saved in the editor.
+- **The reload after an add.** After the panel adds terms, the admin loads the entry page again. This reload loses the changes that are not saved. The emdash 1.3.1 admin has no `beforeunload` guard, so the browser does not warn the user.
+- **Entries with a null locale.** For an entry with a `null` locale, the panel reads the taxonomies and the terms of all locales. Thus the panel can show a taxonomy group more than one time. This case is rare. The `locale` columns of the taxonomy tables are NOT NULL since migration 036 of emdash 1.3.1, and the `locale` columns of the content tables are NOT NULL since migration 019.
+- **The plugin version.** The descriptor sets `version` by hand. A test in `test/emdash-plugin.test.ts` fails when it is not the version in `package.json`.
 - **Native EmDash plugins.** How a page can read the data of a native EmDash plugin is an open question upstream. Until EmDash answers it, the site helper is the supported design.

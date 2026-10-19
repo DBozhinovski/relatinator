@@ -31,6 +31,14 @@
     "./emdash": {
       "types": "./dist/emdash.d.ts",
       "import": "./dist/emdash.js"
+    },
+    "./emdash-plugin": {
+      "types": "./dist/emdash-plugin.d.ts",
+      "import": "./dist/emdash-plugin.js"
+    },
+    "./emdash-plugin/sandbox": {
+      "types": "./dist/emdash-plugin-entry.d.ts",
+      "import": "./dist/emdash-plugin-entry.js"
     }
   },
   "files": [
