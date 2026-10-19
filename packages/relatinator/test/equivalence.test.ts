@@ -15,12 +15,25 @@ import type {
 // published relatinator@3.0.0, including exact scores, tie order, and
 // error messages.
 
-type Api = Pick<typeof current, "createModel" | "tokenize">;
+// Model members that 3.0.0 does not have. The probes and the shape check
+// leave them out.
+const ADDED_MEMBERS = [
+  "findRelatedScored",
+  "findRelatedToTextScored",
+  "explainRelated",
+] as const;
+type ReferenceModel = Omit<RelatinatorModel, (typeof ADDED_MEMBERS)[number]>;
+type Api = {
+  readonly createModel: (
+    ...args: Parameters<typeof current.createModel>
+  ) => ReferenceModel;
+  readonly tokenize: typeof current.tokenize;
+};
 type Outcome =
   | { readonly value: unknown }
   | { readonly error: { readonly name: string; readonly message: string } };
 type Entry = readonly [call: string, outcome: Outcome];
-type Probe = readonly [call: string, run: (model: RelatinatorModel) => unknown];
+type Probe = readonly [call: string, run: (model: ReferenceModel) => unknown];
 
 function outcome(run: () => unknown): Outcome {
   try {
@@ -33,7 +46,7 @@ function outcome(run: () => unknown): Outcome {
 
 // Calls the methods without their object, as `const { findRelated } = model`
 // does.
-function detached(model: RelatinatorModel): RelatinatorModel {
+function detached(model: ReferenceModel): ReferenceModel {
   const { method, size, has, findRelated, findRelatedToText } = model;
   const { getTopTerms, getTopDocumentsForTerm } = model;
   return {
@@ -55,8 +68,15 @@ function record(
 ): Entry[] {
   const built = outcome(() => api.createModel(docs, options));
   if (!("value" in built)) return [["createModel", built]];
-  const model = built.value as RelatinatorModel;
-  const shape = { keys: Object.keys(model), method: model.method };
+  const model = built.value as ReferenceModel;
+  const added: readonly string[] = ADDED_MEMBERS;
+  const all = Object.keys(model);
+  // The new members must come after the 3.0.0 keys, so only the tail is cut.
+  const keys = all.slice(
+    0,
+    all.length - all.filter((key) => added.includes(key)).length
+  );
+  const shape = { keys, method: model.method };
   return [
     ["createModel", { value: { ...shape, size: model.size } }],
     ...probes.map(([call, run]): Entry => [

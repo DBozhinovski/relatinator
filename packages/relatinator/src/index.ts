@@ -15,6 +15,11 @@ export interface ScoredTerm {
   score: number;
 }
 
+export interface ScoredDocument {
+  id: string;
+  score: number;
+}
+
 export interface QueryOptions {
   limit?: number;
   /** Ids to leave out of the results. */
@@ -31,6 +36,12 @@ export interface RelatinatorModel {
   findRelatedToText(text: string, options?: QueryOptions): string[];
   getTopTerms(id: string, limit?: number): ScoredTerm[];
   getTopDocumentsForTerm(term: string, limit?: number): string[];
+  findRelatedScored(id: string, options?: QueryOptions): ScoredDocument[];
+  findRelatedToTextScored(
+    text: string,
+    options?: QueryOptions
+  ): ScoredDocument[];
+  explainRelated(id: string, otherId: string, limit?: number): ScoredTerm[];
 }
 
 export interface Topic {

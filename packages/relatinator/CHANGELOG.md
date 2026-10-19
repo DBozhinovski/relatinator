@@ -6,9 +6,11 @@ All notable changes to the "relatinator" project will be documented in this file
 
 - **New:** `findRelated()` and `findRelatedToText()` accept `filter: (id) => boolean`. A document stays in the results only when `filter` returns `true`.
 - **New:** `findRelated()` accepts `exclude`, as `findRelatedToText()` does. Version 3.2.0 did not read `exclude` in `findRelated()`, and TypeScript rejected it.
+- **New:** `findRelatedScored()` and `findRelatedToTextScored()` return the results of `findRelated()` and `findRelatedToText()` with the score of each id, as `{ id, score }[]`. The ids, their order, and the scores are the same as in the ranking.
+- **New:** `explainRelated(id, otherId, limit)` returns the terms of document `id` that also occur in document `otherId`, as `{ term, score }[]`. The score of a term is its count in document `id`, multiplied by its weight in document `otherId`. With `limit` set to `Infinity`, the term scores add up to the score of `otherId` for the query `id`. The terms are stems. The default `limit` is 5.
 - `exclude` and `filter` apply before `limit`, so a filtered list still has `limit` ids when enough documents match. They do not change the weights.
-- Without `exclude` and `filter`, the results, the tie order, and the scores are the same as in 3.2.0. The equivalence test with 3.0.0 passes without changes.
-- The minified bundle of `dist/index.js` is 9594 bytes. In version 3.2.0, it was 9499 bytes.
+- Without `exclude` and `filter`, the results, the tie order, and the scores are the same as in 3.2.0. The equivalence test with 3.0.0 passes. Its check of the model keys now ignores the three new methods, because 3.0.0 does not have them.
+- The minified bundle of `dist/index.js` is 10131 bytes. In version 3.2.0, it was 9499 bytes.
 
 ## [3.2.0] - 2026-10-18
 
