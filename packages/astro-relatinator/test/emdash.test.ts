@@ -123,6 +123,154 @@ describe("getEmDashRelated", () => {
   });
 });
 
+describe("getEmDashRelated previews and drafts", () => {
+  it("ranks a preview of a published entry by the preview text, without the published entry", async () => {
+    const preview = {
+      ...posts[3],
+      data: {
+        ...posts[3].data,
+        content: [
+          block("Flour, water and salt make bread."),
+          block("Spiral galaxies hold billions of stars."),
+        ],
+      },
+    };
+
+    expect(ids(await getEmDashRelated("posts", preview))).toEqual(["galaxies"]);
+  });
+
+  it("ranks an entry object with the published text as its id", async () => {
+    const options = {
+      limit: 1,
+      filter: (entry: { id: string }) => entry.id !== "event-horizon",
+    };
+
+    expect(ids(await getEmDashRelated("posts", { ...posts[0] }))).toEqual([
+      "event-horizon",
+      "galaxies",
+    ]);
+    expect(
+      ids(await getEmDashRelated("posts", { ...posts[0] }, options))
+    ).toEqual(["galaxies"]);
+  });
+
+  it.each([6, 100])(
+    "ranks each published entry object as its id, with ties and limit %s",
+    async (limit) => {
+      // Entries with the same index modulo 12 have the same text.
+      const notes = setEmDashCollection(
+        "ties",
+        Array.from({ length: 80 }, (_, index) => ({
+          id: `note-${index}`,
+          data: {
+            id: `row-${index}`,
+            title: `common w${index % 4} v${index % 6}`,
+          },
+        }))
+      );
+
+      for (const note of notes) {
+        const byId = ids(await getEmDashRelated("ties", note.id, { limit }));
+        expect(byId.length).toBe(Math.min(limit, 79));
+        expect(ids(await getEmDashRelated("ties", note, { limit }))).toEqual(
+          byId
+        );
+      }
+    }
+  );
+
+  it.each([6, 100])(
+    "ranks each published entry object as its id, with close scores and limit %s",
+    async (limit) => {
+      // For "w4", "w8" and "w9" have close scores. Another order of the
+      // terms in the sum changes their order.
+      const notes = setEmDashCollection(
+        "close",
+        [
+          "grove indigo heron ember fjord cedar grove",
+          "juniper amber birch amber heron amber birch",
+          "juniper birch cedar birch fjord",
+          "cedar juniper juniper juniper",
+          "delta ember grove amber delta grove",
+          "grove amber amber grove grove heron birch",
+          "fjord indigo",
+          "juniper cedar delta fjord amber",
+          "cedar cedar delta heron grove ember juniper",
+          "juniper delta birch amber cedar grove indigo",
+          "ember fjord indigo",
+          "grove ember cedar",
+        ].map((title, index) => ({ id: `w${index}`, data: { title } }))
+      );
+
+      for (const note of notes) {
+        expect(ids(await getEmDashRelated("close", note, { limit }))).toEqual(
+          ids(await getEmDashRelated("close", note.id, { limit }))
+        );
+      }
+    }
+  );
+
+  // EmDash gives each entry the id of its content row in `data.id`.
+  const renames = [
+    { id: "sourdough", data: { id: "01BREAD", title: "Sourdough bread" } },
+    {
+      id: "levain",
+      data: {
+        id: "01LEVAIN",
+        translationGroup: "01BREAD",
+        title: "Sourdough levain",
+      },
+    },
+    { id: "galaxies", data: { id: "01SKY", title: "Spiral galaxies" } },
+  ];
+  const renamed = {
+    id: "sourdough-loaf",
+    data: { id: "01BREAD", title: "Sourdough bread loaf" },
+  };
+
+  it("does not return the published entry of a draft that changes the slug", async () => {
+    setEmDashCollection("renames", renames);
+
+    expect(ids(await getEmDashRelated("renames", renamed))).toEqual(["levain"]);
+  });
+
+  it("ranks an id by the published text, and throws for the id of a draft", async () => {
+    setEmDashCollection("renames", renames);
+
+    expect(ids(await getEmDashRelated("renames", "sourdough"))).toEqual([
+      "levain",
+    ]);
+    await expect(getEmDashRelated("renames", renamed.id)).rejects.toThrow(
+      'no published entry "sourdough-loaf" in EmDash collection "renames"'
+    );
+  });
+
+  it("compares and ranks a preview by the `text` option", async () => {
+    const text = (entry: { data: { title?: unknown } }) =>
+      String(entry.data.title);
+    const preview = (data: object) => ({
+      ...posts[3],
+      data: { ...posts[3].data, ...data },
+    });
+    const galaxies = [block("Spiral galaxies hold billions of stars.")];
+
+    expect(
+      ids(
+        await getEmDashRelated("posts", preview({ content: galaxies }), {
+          text,
+        })
+      )
+    ).toEqual([]);
+    expect(
+      ids(
+        await getEmDashRelated("posts", preview({ title: "Galaxies" }), {
+          text,
+        })
+      )
+    ).toEqual(["galaxies"]);
+  });
+});
+
 describe("getEmDashRelated corpus", () => {
   it("reads every page of the collection", async () => {
     const filler = Array.from({ length: 150 }, (_, index) => ({
@@ -743,6 +891,28 @@ describe("getEmDashRelated maxAge", () => {
       reads: 0,
       texts: 1,
     });
+  });
+
+  it("ranks a preview by its text with the model of the window", async () => {
+    setEmDashCollection("window-preview", birds("night bat hunts"));
+    await related("window-preview", "owl", { maxAge: 60 });
+    const preview = { id: "owl", data: { title: "morning owl sings" } };
+
+    at(30);
+    expect(await related("window-preview", preview, { maxAge: 60 })).toEqual({
+      result: ["lark"],
+      reads: 0,
+      texts: 1,
+    });
+    expect(
+      await related(
+        "window-preview",
+        { ...preview, data: birds("")[0].data },
+        {
+          maxAge: 60,
+        }
+      )
+    ).toEqual({ result: ["bat"], reads: 0, texts: 1 });
   });
 
   it("starts the window again after a full read without maxAge", async () => {

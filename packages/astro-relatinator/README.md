@@ -331,7 +331,7 @@ The options are the same as for `getRelated()`: `limit` (default `5`), `method` 
 | `locale` | `string` | EmDash selects it | The locale of the entries to read. `getEmDashRelated()` gives it to `getEmDashCollection()`.                                                                                 |
 | `maxAge` | `number` | `0`               | The number of seconds to use the last full read of the collection again. With `0`, each call reads the collection. [Freshness window](#freshness-window) tells how it works. |
 
-The `text` function gets each published entry. It also gets the entry object that you give when its id is not in the published entries. Thus the type of its argument is `EmDashEntry<Partial<D>>`, and each key of `entry.data` can be `undefined`.
+The `text` function gets each published entry. It also gets the entry object that you give. Thus the type of its argument is `EmDashEntry<Partial<D>>`, and each key of `entry.data` can be `undefined`.
 
 The `filter` function gets only published entries. Thus the type of its argument is `EmDashEntry<D>`.
 
@@ -388,12 +388,20 @@ await getEmDashRelated("posts", post, {
 
 The model contains only the published entries of the collection. `getEmDashRelated()` reads all pages of the collection with `getEmDashCollection()`.
 
-EmDash uses the slug of an entry as its id. Thus a preview of a published entry has the id of the published entry, unless the draft changes the slug.
+EmDash uses the slug of an entry as its id. Thus a preview of a published entry has the id of the published entry, unless the draft changes the slug. EmDash keeps each entry in a content row, and puts the id of this row in `entry.data.id`. A draft or a preview has the same `data.id` as the published entry, also when the draft changes the slug.
 
-- If you give the id of an entry that is not published, `getEmDashRelated()` throws an error.
-- If you give an entry object whose id is in the published entries, `getEmDashRelated()` uses the published text of that id. It does not read the text of the object. For a preview of a published entry, the related entries come from the published text, not from the preview text.
-- If you give an entry object whose id is not in the published entries, `getEmDashRelated()` uses the text of the object. An example is a draft of an entry that was never published. The result does not contain that id.
+- If you give an id, `getEmDashRelated()` uses the published text of that entry. If the id is not published, it throws an error.
+- If you give an entry object, `getEmDashRelated()` makes the text of the object. It uses `text` or `fields` when you set them.
+- If this text is the published text of the same id, the result is the same as for the id.
+- Otherwise, `getEmDashRelated()` uses the text of the object. Examples are a preview with changes, a draft that changes the slug, and a draft of an entry that was never published. The result does not contain the id of the object. It also does not contain a published entry with the same `data.id`, such as the published version of a draft with a new slug.
 - If EmDash returns an error, `getEmDashRelated()` throws an error that names the collection.
+
+In emdash 1.3.1, the read of a preview contains the draft of the previewed entry, and the read in edit mode contains all drafts. A call in these requests does not use a [freshness window](#freshness-window). Thus the model and the entry object have the same text. The text of the object changes the list in these cases:
+
+- With emdash 1.0.0, the read of a preview contains no drafts. Thus a preview with changes gets the list of its own text.
+- In a request that is not a preview or edit mode, the object can have a different text than the model. Examples are an object that your page changes, and an entry that changed after the read of a freshness window.
+
+If your entry object has no `data.id`, the result can contain the published version of a draft with a new slug.
 
 ### Caching on servers and Workers
 
@@ -416,7 +424,7 @@ await getEmDashRelated("posts", post, { limit: 3, maxAge: 60 });
 - The last full read must be for the same collection, locale, `method`, and `fields` or `text`. Thus each locale has its own window.
 - A call without `maxAge` reads the collection. If a window exists for the same options, this read starts a new window.
 - A call in a preview or in edit mode does not use a window and does not keep its read. In emdash 1.3.1, these reads contain drafts. A window with such a read would show drafts on public pages.
-- An entry object that is not published, such as a draft, uses the model of the window and its own text.
+- In other requests, an entry object uses the model of the window and its own text.
 - `maxAge` must be a number from 0. Other values cause a `RangeError`. `Infinity` keeps the first read for the life of the process or isolate.
 
 The tradeoff is stale lists. Inside the window, the related lists do not show changes that are published after the read. A new entry is not in the lists. An unpublished or deleted entry can stay in the lists, and its link can go to a page that does not exist. A list can be `maxAge` seconds old.

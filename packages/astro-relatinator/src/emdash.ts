@@ -1,4 +1,4 @@
-import type { QueryOptions, RelatinatorModel } from "relatinator";
+import type { QueryOptions } from "relatinator";
 import { emdashEntryText } from "./emdash-text.js";
 import { portableTextToPlainText } from "./portable-text.js";
 import {
@@ -20,9 +20,8 @@ export interface EmDashEntry<D extends object = Record<string, unknown>> {
 }
 
 /**
- * `text` gets the published entries and, for an entry object that is not
- * published, that object. Thus its data is a part of `D`. `filter` gets
- * only published entries.
+ * `text` gets the published entries and the entry object. Thus its data
+ * is a part of `D`. `filter` gets only published entries.
  */
 export interface GetEmDashRelatedOptions<
   D extends object = Record<string, unknown>,
@@ -142,7 +141,9 @@ async function publishedIndex<D extends object>(
  * Finds the published entries of an EmDash `collection` that are most
  * related to `entry`, in rank order. The model is built once and reused
  * until an entry changes. `D` is the type of `data` in the published
- * entries. An entry object can have only a part of `D`.
+ * entries. An entry object can have only a part of `D`. When its text is
+ * not the published text of its id, such as in a preview, the query is
+ * its text.
  */
 export async function getEmDashRelated<
   D extends object = Record<string, unknown>,
@@ -157,23 +158,46 @@ export async function getEmDashRelated<
     text ?? ((e: EmDashEntry<Partial<D>>) => emdashEntryText(e, fields));
   const index = await publishedIndex(collection, options, textOf);
   return index.entries(
-    rank(index.model, collection, entry, textOf, index.query(options))
+    rank(index, collection, entry, textOf, index.query(options))
   );
 }
 
+/**
+ * The id of the content row of an entry. EmDash puts it in `data.id`. A
+ * draft or a preview keeps the id of its row when its slug changes.
+ */
+function rowId(entry: EmDashEntry<object>): unknown {
+  return (entry.data as { id?: unknown }).id;
+}
+
+/** The ids of the corpus entries that come from the row of `entry`. */
+function sameRow(
+  index: RelatedIndex<EmDashEntry<object>>,
+  entry: EmDashEntry<object>
+): string[] {
+  const row = rowId(entry);
+  if (typeof row !== "string" || row === "") return [];
+  return index.idsWhere((published) => rowId(published) === row);
+}
+
 function rank<E extends EmDashEntry<object>>(
-  model: RelatinatorModel,
+  index: RelatedIndex<EmDashEntry<object>>,
   collection: string,
   entry: E | string,
   textOf: (entry: E) => string,
   query: QueryOptions
 ): string[] {
-  const id = typeof entry === "string" ? entry : entry.id;
-  if (model.has(id)) return model.findRelated(id, query);
-  if (typeof entry === "string") {
-    throw new Error(
-      `astro-relatinator: no published entry "${id}" in EmDash collection "${collection}"`
-    );
+  const { model } = index;
+  if (typeof entry !== "string") {
+    // For a published entry with its published text, this gives the
+    // same list as `findRelated(entry.id)`.
+    return model.findRelatedToText(textOf(entry), {
+      ...query,
+      exclude: [entry.id, ...sameRow(index, entry)],
+    });
   }
-  return model.findRelatedToText(textOf(entry), { ...query, exclude: [id] });
+  if (model.has(entry)) return model.findRelated(entry, query);
+  throw new Error(
+    `astro-relatinator: no published entry "${entry}" in EmDash collection "${collection}"`
+  );
 }

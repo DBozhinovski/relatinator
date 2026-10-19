@@ -161,11 +161,25 @@ Without this rule, the text contains the bylines and the ids, and posts by the s
 
 `getEmDashRelated()` returns entries from the corpus, not the entry that the page gives. Its type parameter `D` is the type of `data` in the published entries, and the result type is `EmDashEntry<D>[]`. The entry parameter is `string | EmDashEntry<D> | EmDashEntry<Partial<D>>`. With `EmDashEntry<Partial<D>>`, a page can give only some of the keys of `D`. The `EmDashEntry<D>` member accepts no other values, but it changes inference. When TypeScript gets `D` only through `Partial<D>`, it removes the `?` modifier from each key. The `text` option gets `EmDashEntry<Partial<D>>`, because it also reads the entry object of the page. Version 3.0.0 used the type of the entry object as the result type.
 
-The model contains only published entries. `rank()` in `src/emdash.ts` selects the query by the entry id. EmDash uses the slug as the entry id, with a locale prefix when i18n routing adds one. `entryIdForRow()` in the emdash 1.2.0 `loader.ts` makes this id. A draft or preview revision takes its id from the revision slug, if the revision has one.
+The model contains only published entries. `rank()` in `src/emdash.ts` selects the query. EmDash uses the slug as the entry id, with a locale prefix when i18n routing adds one. `entryIdForRow()` in the emdash 1.3.1 `loader.ts` makes this id. A draft or preview revision takes its id from the revision slug, if the revision has one (`revisionEntry()` in `loader.ts`). A draft stages a slug change as `_slug` in the revision, and the content row keeps the old slug until the draft is published (`emdash-runtime.ts` and `createSlugChangeRedirect()` in `api/handlers/content.ts`).
 
-- If the id is in the model, `rank()` calls `findRelated(id)`. The query is the published text of that id. `rank()` does not read the text of the given object.
-- Otherwise, if the page gave an entry object, `rank()` calls `findRelatedToText()` with the text of the object. It excludes the id of the object.
-- Otherwise, if the page gave a string, `getEmDashRelated()` throws an error.
+`revisionEntry()` copies the system columns of the content row to `entry.data`, also the `id` column. Thus a draft or a preview has the same `data.id` as the published entry of the same row, also with a new slug. In emdash 1.0.0, the preview branch of `loadEntry()` in `src/loader.ts` does the same with `INCLUDE_IN_DATA`. Each locale of an entry is a separate row with its own id. The rows of the translations share `translationGroup`, not `id`.
+
+- If the page gave a string, `rank()` calls `findRelated(id)`. If the id is not in the model, `getEmDashRelated()` throws an error.
+- If the page gave an entry object, `rank()` calls `findRelatedToText()` with the text of the object. It excludes the id of the object and each corpus entry with the same `data.id`. These are the published entry itself, a preview with changes, a draft with a new slug, and a draft that was never published.
+
+For an object with the published text, `findRelatedToText()` gives the same list as `findRelated(id)`. `astro-relatinator` 3.1.0 calls `findRelated(id)` for an object whose id is in the model. Both functions tokenize the same text, and they sum the terms in the same order. These functions are in `packages/relatinator/src/model.ts`:
+
+- `score()` in `createScorer()` sums the terms in the order of the query.
+- For `findRelated()`, the query is the indexed document. `termCounter()` keeps its terms in the order of their first occurrence.
+- For `findRelatedToText()`, `queryOf()` makes the query. It keeps the order of `countTerms()`, which is also the order of the first occurrence.
+
+The tests "ranks each published entry object as its id, with ties and limit %s" and "ranks each published entry object as its id, with close scores and limit %s" in `test/emdash.test.ts` check this, with `limit` 6 and 100. In the corpus with close scores, a different order of the terms in the sum changes the list. The cost is one text and one tokenization of the object for each call.
+
+In emdash 1.3.1, the collection read of a preview request serves the draft of the previewed entry, and the read of an edit-mode request serves all drafts (`draftRevisions` in `getEmDashCollectionUncached()` in `query.ts`, and `loadDraftRevisions()` in `loader.ts`). A call in these requests does not use a window. Thus the corpus contains the draft text, and the object has the same text. The text of the object changes the list in these cases:
+
+- With emdash 1.0.0. Its middleware also sets `preview` and `editMode` in the request context (`src/astro/middleware/request-context.ts`). But its collection read does not serve drafts (`getEmDashCollectionUncached()` in `src/query.ts` and `loadCollection()` in `src/loader.ts`). Only `getEmDashEntry()` serves the draft of a preview, through `loadEntry()` in `src/loader.ts`. Thus the object of a preview has a different text than the corpus.
+- In a request that is not a preview or edit mode, when the object has a different text than the corpus. Examples are an object that the page changes, and an entry that changed after the read of a `maxAge` window.
 
 ### A freshness window, not a saved model
 
@@ -185,9 +199,9 @@ These rules apply:
 - The window state is the `recentReads` map in `src/emdash.ts`. For each cache key, it keeps the time of the last full read and the index of that read: the model and the entries. Thus the model, the result entries, and the entries that `filter` gets come from the same read. `getCachedModel()` does not change.
 - The key of the map is the key of the model cache, from `modelKey()`. Thus one function makes both keys. A call for a different collection, locale, `method`, or text source does not use the window.
 - A call with `maxAge` above 0 keeps its full read. A call with `maxAge` 0 updates the read only if the key already has one. Thus a site without `maxAge` keeps no entries in memory.
-- A call in a preview request or in edit mode does not use a window and does not keep its read. In emdash 1.3.1, the read of a preview request contains the draft of the previewed entry, and the read in edit mode contains all drafts (`draftRevisions` in `getEmDashCollectionUncached()` in `query.ts`). A window with such a read would show drafts on public pages. The call reads `preview` and `editMode` from `getRequestContext()`. The test "does not start a window in edit mode" in `test/emdash.test.ts` fails without this rule: after an edit-mode read, a public call inside the window returns the list of the draft. Other tests in the same file check a preview or edit-mode call while a public window exists, with `maxAge` 0 and 60.
+- A call in a preview request or in edit mode does not use a window and does not keep its read. In emdash 1.3.1, the read of a preview request contains the draft of the previewed entry, and the read in edit mode contains all drafts. A window with such a read would show drafts on public pages. The call reads `preview` and `editMode` from `getRequestContext()`. The test "does not start a window in edit mode" in `test/emdash.test.ts` showed the leak before this rule: after an edit-mode read, a public call inside the window returned the list of the draft. Other tests in the same file check a preview or edit-mode call while a public window exists, with `maxAge` 0 and 60.
 - The window starts when the read starts. A call inside the window does not move it. At exactly `maxAge` seconds, the call reads the collection again.
-- An entry object that is not in the model uses the model of the window and its own text, as without a window.
+- In a request that is not a preview or edit mode, an entry object uses the model of the window and its own text, as without a window.
 - A `maxAge` value that is not a number from 0 causes a `RangeError`, as the `ratio` of `classify()` does. `Infinity` is valid. It keeps the first read for the life of the process or isolate.
 - The clock is `Date.now()`. In workerd, `Date.now()` changes only at I/O, so it does not change while code runs. It changes between requests, so the window ends between requests.
 - Each process or isolate has its own window. The package does not share a window between isolates.
@@ -306,7 +320,7 @@ The assigned terms stay in the `classify()` call. The panel removes them from th
 This section lists the checks behind the claims in the READMEs. There are two types of checks:
 
 - Automated checks are scripts in this repository. No CI runs them. Run them by hand before a release.
-- Manual checks ran one time, during the 3.0 work on 2026-10-15, during the 3.1 work on 2026-10-16, and during the topic plugin work, the live collection work, and the workerd measurement on 2026-10-19. Only the workerd measurement has scripts in the repository, in `packages/astro-relatinator/bench/workerd`. The procedures below repeat the consumer builds, the Cloudflare check, the EmDash check, the live collection check, and the workerd measurement. The negative control, the 2.x baseline, the 3.1 checks, and the topic plugin checks have no written procedure.
+- Manual checks ran one time, during the 3.0 work on 2026-10-15, during the 3.1 work on 2026-10-16, and during the topic plugin work, the live collection work, the workerd measurement, and the preview work on 2026-10-19. Only the workerd measurement has scripts in the repository, in `packages/astro-relatinator/bench/workerd`. The procedures below repeat the consumer builds, the Cloudflare check, the EmDash check, the live collection check, the preview check, and the workerd measurement. The negative control, the 2.x baseline, the 3.1 checks, and the topic plugin checks have no written procedure.
 
 ### Automated checks
 
@@ -314,7 +328,7 @@ Run these commands from the repository root. The results are from 2026-10-16, wi
 
 | Command                                                    | What it checks                                                                                                                                                                                                                                                                                                                                                                             | Result on 2026-10-16                                                                                                                                                                                                |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, the scores and shared terms, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests the three helpers, the text rules and the exported text functions, the cache, the `maxAge` window, the types of `getEmDashRelated()` and `getLiveRelated()`, and the topic plugin. | 203 tests in `relatinator` and 111 in `astro-relatinator` on 2026-10-19. `test/classify.test.ts` has 19 of them.                                                                                                    |
+| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, the scores and shared terms, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests the three helpers, the text rules and the exported text functions, the cache, the `maxAge` window, the types of `getEmDashRelated()` and `getLiveRelated()`, and the topic plugin. | 203 tests in `relatinator` and 121 in `astro-relatinator` on 2026-10-19. `test/classify.test.ts` has 19 of them.                                                                                                    |
 | `pnpm --filter relatinator test equivalence`               | Runs only `test/equivalence.test.ts`. It compares the results, the scores, the tie order, and the errors of `src` with `relatinator` 3.0.0. The inputs are synthetic corpora, the fixture posts, the playground posts, seven option sets, `limit` values next to 64, odd `limit` values, more than 100,000 different words, and strings with Unicode edge cases.                           | 63 tests.                                                                                                                                                                                                           |
 | `pnpm check`                                               | `tsc` checks the source and the tests of both libraries, also the `test/live-types` project. `astro check` checks the playground.                                                                                                                                                                                                                                                          | No errors. `astro check` reports 0 errors.                                                                                                                                                                          |
 | `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                                                  | 10131 bytes (9.9 KB), no imports, on 2026-10-19.                                                                                                                                                                    |
@@ -325,7 +339,7 @@ Run these commands from the repository root. The results are from 2026-10-16, wi
 
 The benchmark times depend on the machine and its load. For the results above, `taskset -c 3` kept each benchmark on one CPU core.
 
-All 314 tests pass on 2026-10-19. The type assertions in `test/emdash-types.test.ts`, `test/public-entry-text.test.ts`, and `test/live-types/live-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
+All 324 tests pass on 2026-10-19. The type assertions in `test/emdash-types.test.ts`, `test/public-entry-text.test.ts`, and `test/live-types/live-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
 
 ### Playground related lists
 
@@ -412,6 +426,33 @@ To repeat the check:
 3. Add `src/live.config.ts` with a live collection and a loader. Add a page with `export const prerender = false` that calls `getLiveRelated()`.
 4. Run `astro check` and `astro build`. Start `node dist/server/entry.mjs` and open the page.
 
+### Manual check of previews and drafts
+
+This check ran on 2026-10-19. It used the EmDash blog template with emdash 1.3.1, SQLite, `@astrojs/node`, and `astro dev`. The packed tarballs of `relatinator` 3.2.0 and `astro-relatinator` were installed. The post page called `getEmDashRelated("posts", post, { limit: 5, maxAge })` with the entry from `getEmDashEntry()`. A `maxAge` query parameter set `maxAge`, with 0 as the default. The check used the "The Case for Static" post. A second run used the tarball of the commit before the preview work. Both runs used code from before the `shared` rule in `publishedIndex()`. Thus in these runs, a preview call could use a window and keep its read in the window.
+
+The admin API made the preview URL and the drafts. `POST /_emdash/api/content/posts/{id}/preview-url` returns a URL with a signed `_preview` token. The `[id]` is the id of the content row. A state-changing request needs the `X-EmDash-Request: 1` header. `GET /_emdash/api/auth/dev-bypass` signs in on a dev server. A `PUT` to the entry with new `data` saved a draft revision. The entry stayed published.
+
+| Case                                                  | Commit before the preview work | Preview work             |
+| ----------------------------------------------------- | ------------------------------ | ------------------------ |
+| Public page, before and after the draft               | Published list (P)             | P                        |
+| Preview of a draft with new text, `maxAge` 0          | Draft list (D)                 | D                        |
+| Same preview, inside a window from a public read      | P                              | D                        |
+| Preview of a draft with a new slug, inside the window | The old slug is first          | P, without the old slug  |
+| Public page inside the window, after a preview read   | Not checked                    | Draft text and its title |
+
+P was `notes-on-simplicity`, `designing-with-constraints`, `a-weekend-with-a-side-project`, `small-tools-big-impact`, `building-for-the-long-term`. The draft had the content of "Learning in Public". D started with `learning-in-public`. The draft with the new slug had the published content. Its preview had the entry id `the-case-for-static-sites` and the `data.id` of the content row. The last row shows the leak of the old code. The `shared` rule removes this leak, and the check below ran on the final code.
+
+A second check ran on 2026-10-19, on the final code. It used an EmDash blog site with emdash 1.3.1 and `@astrojs/node`, on the dev server. The tarballs were packed from the working tree of this change. The post page called `getEmDashRelated("posts", post, { limit: 5, maxAge })`. A `maxAge` query parameter set `maxAge`.
+
+1. A request opened the preview URL of `the-case-for-static` with `maxAge=600`. The title of the draft is "Static sites, learned in public". The page showed this title. The related list was `learning-in-public`, `building-for-the-long-term`, `a-weekend-with-a-side-project`, `notes-on-simplicity`, `small-tools-big-impact`.
+2. Then two public requests opened `/posts/learning-in-public?maxAge=600`, inside the same window. Each page showed `building-for-the-long-term`, `a-weekend-with-a-side-project`, `notes-on-simplicity`, `small-tools-big-impact`, `the-case-for-static`. The title of `the-case-for-static` was the published title "The Case for Static". The draft title occurred 0 times in the two responses.
+
+To repeat the check:
+
+1. Pack the two libraries, as in step 1 of the consumer builds. Install the tarballs in an EmDash site.
+2. Call `getEmDashRelated()` in the post page with the entry from `getEmDashEntry()`, and render the ids.
+3. Save a draft of a published post, and make a preview URL. Open the public page and the preview URL with and without a `maxAge`.
+
 ### Workerd measurement of `getEmDashRelated()`
 
 This measurement ran on 2026-10-19, in two runs. It times `getEmDashRelated()` in the post page of an EmDash site on the Cloudflare adapter. `astro preview` runs the built worker in local workerd, with a local D1 database.
@@ -486,10 +527,10 @@ The scripts need Linux, because they read `/proc` and use `taskset` and `pgrep`.
 
 ## Known gaps and follow-ups
 
-These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17. The topic plugin items, the live collection item, and the workerd items were open on 2026-10-19.
+These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17. The topic plugin items, the live collection item, the workerd items, and the preview item were open on 2026-10-19.
 
 - **Astro 6 in the repository.** All workspace packages use Astro 7.3.8. Only the manual consumer build used Astro 6.4.8.
-- **Lowest supported versions.** No check covers the lowest versions of the supported ranges. All checks ran on Node.js 24.13.1, not on Node.js 22.12. The Astro checks used 6.4.8 and 7.3.8, not 6.0 and 7.0. The EmDash check used 1.2.0, not 1.0. For emdash 1.0.0, only the result type of `getEmDashCollection()` was read.
+- **Lowest supported versions.** No check covers the lowest versions of the supported ranges. All checks ran on Node.js 24.13.1, not on Node.js 22.12. The Astro checks used 6.4.8 and 7.3.8, not 6.0 and 7.0. The EmDash check used 1.2.0, and the preview checks used 1.3.1, not 1.0. For emdash 1.0.0, a code reading on 2026-10-19 covered the result type of `getEmDashCollection()`, the request context, the collection read, and the `data.id` of a preview. No check ran a site with emdash 1.0.0.
 - **On-demand pages with `getRelated()`.** No check renders `getRelated()` in an on-demand page. The EmDash check covers on-demand rendering only through `getEmDashRelated()`, and the live collection check only through `getLiveRelated()`.
 - **Live collections.** The live collection check used Astro 7.3.8 and the Node.js adapter only. No check used Astro 6, the Cloudflare adapter, `astro dev`, or a real API loader. `getLiveRelated()` does not give a loader filter to `getLiveCollection()`, so each call loads the whole collection. It does not use `cacheHint`. The result type depends on `LiveLoaderDataType`, which Astro does not document. If a later Astro version renames this type, the result type can become `any`, or `tsc` can report an error.
 - **Browsers.** No test runs `relatinator` in a browser. The portability check shows only that the bundle has no imports.
@@ -499,11 +540,10 @@ These items were open on 2026-10-16. The three `classify()` items were open on 2
 - **Prettier configuration.** `.prettierrc` in both libraries sets `jsxBracketSameLine`, which Prettier 3 deprecates. Each Prettier run prints a warning.
 - **Prettier coverage.** Only the two libraries have `format:check` scripts. The root README, `docs/`, and the playground have no Prettier check.
 - **Double build in `pnpm check`.** The `precheck` script of `astro-relatinator` builds `relatinator`. Then the `precheck` script of the playground builds `relatinator` and `astro-relatinator` again.
-- **`relatedIndex()` trusts its callers.** When `text` is set, `versionOf` must return the text that `text` returns. Both callers do this, but `relatedIndex()` does not enforce it.
+- **`relatedIndex()` trusts its callers.** When `text` is set, `versionOf` must return the text that `text` returns. All three callers do this, but `relatedIndex()` does not enforce it.
 - **Two meanings of `entries`.** In `src/related-index.ts`, `Corpus.entries` is an array of entries. `RelatedIndex.entries(ids)` is a function that maps ids to entries.
 - **`limit` and `filter` in the shared options.** `RelatedOptions` contains `limit` and `filter`, but `relatedIndex()` does not read them. `getRelated()` and `getEmDashRelated()` give them to the model.
-- **Preview of a published entry.** A preview of a published entry has the id of the published entry. `getEmDashRelated()` ranks it by the published text, not by the preview text. Thus the related list does not show the effect of unpublished edits.
-- **Draft with a new slug.** If a draft revision changes the slug of a published entry, the draft id is not in the model. `getEmDashRelated()` then queries with the draft text and excludes only the new id. The published version of the same entry can then be in the results. This item comes from a code reading of `src/emdash.ts` and the emdash 1.2.0 `loader.ts`. No test or manual check covers it.
+- **Entry objects without `data.id`.** The exclusion of the published version of a draft with a new slug needs `data.id`. A page that gives an object without `data.id` can get the published version in the list.
 - **Warm EmDash calls.** Without `maxAge`, each `getEmDashRelated()` call reads every entry and makes the text of every entry, because the cache uses the text as the version. In the [workerd measurement](#workerd-measurement-of-getemdashrelated) with 1,005 posts, the read took most of the time of a later call: 251 of 274 ms. The text took 18 ms. `maxAge` skips both inside a window, but the lists can then be stale. No check measured a call on Cloudflare D1 over the network.
 - **Cold EmDash calls.** The first call in each isolate builds the model. In local workerd, the build took 182 ms for 200 posts and 831 ms for 1,005 posts. This is more than the 10 ms of CPU time for each request of the Workers Free plan. A saved model could remove the build. The package does not have one. [A freshness window, not a saved model](#a-freshness-window-not-a-saved-model) gives the reasons.
 - **`text` functions in a window.** Two `text` functions with the same source code share one window. The window does not compare their texts.

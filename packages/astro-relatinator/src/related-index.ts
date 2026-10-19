@@ -46,6 +46,8 @@ export interface RelatedIndex<E> {
   entries(ids: readonly string[]): E[];
   /** Query options for the model. Its id filter gives `filter` the entry of each id. */
   query(options: Pick<RelatedOptions<E>, "limit" | "filter">): QueryOptions;
+  /** The ids of the entries of the corpus that `match` accepts. */
+  idsWhere(match: (entry: E) => boolean): string[];
 }
 
 type ModelOptions<E> = Pick<RelatedOptions<E>, "method" | "fields" | "text">;
@@ -101,5 +103,6 @@ export function relatedIndex<E extends ContentEntry>(
       limit,
       filter: filter && ((id) => filter(entryOf(id))),
     }),
+    idsWhere: (match) => entries.filter(match).map((entry) => entry.id),
   };
 }
