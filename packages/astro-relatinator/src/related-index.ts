@@ -1,14 +1,24 @@
 import {
   createModel,
+  type QueryOptions,
   type RelatinatorModel,
   type SimilarityMethod,
 } from "relatinator";
 import type { ContentEntry } from "./entry-text.js";
 import { getCachedModel } from "./model-cache.js";
 
-export interface RelatedOptions<E> {
+/**
+ * `E` is the entry that `text` gets. `R` is the entry that `filter` gets,
+ * which is an entry of the corpus.
+ */
+export interface RelatedOptions<E, R = E> {
   /** Maximum number of related entries. Default: 5. */
   limit?: number;
+  /**
+   * Keeps an entry in the results only when it returns true. The filter
+   * applies before `limit`. It does not change the model.
+   */
+  filter?: (entry: R) => boolean;
   /** Scoring method. Default: "bm25". */
   method?: SimilarityMethod;
   /**
@@ -34,6 +44,26 @@ export interface RelatedIndex<E> {
   readonly model: RelatinatorModel;
   /** The entries of the corpus with the given ids, in the same order. */
   entries(ids: readonly string[]): E[];
+  /** Query options for the model. Its id filter gives `filter` the entry of each id. */
+  query(options: Pick<RelatedOptions<E>, "limit" | "filter">): QueryOptions;
+  /** The ids of the entries of the corpus that `match` accepts. */
+  idsWhere(match: (entry: E) => boolean): string[];
+}
+
+type ModelOptions<E> = Pick<RelatedOptions<E>, "method" | "fields" | "text">;
+
+const DEFAULT_METHOD: SimilarityMethod = "bm25";
+
+/**
+ * The model cache key: the corpus key, the method, and the text source.
+ * The text source is `fields` as JSON or the source code of `text`.
+ */
+export function modelKey<E>(
+  corpusKey: string,
+  { method = DEFAULT_METHOD, fields, text }: ModelOptions<E>
+): string {
+  const source = text ? `text:${text}` : `fields:${JSON.stringify(fields)}`;
+  return `${corpusKey}\u0000${method}\u0000${source}`;
 }
 
 /**
@@ -44,11 +74,11 @@ export interface RelatedIndex<E> {
  */
 export function relatedIndex<E extends ContentEntry>(
   { key, entries, textOf, versionOf }: Corpus<E>,
-  { method = "bm25", fields, text }: RelatedOptions<E>
+  options: ModelOptions<E>
 ): RelatedIndex<E> {
-  const source = text ? `text:${text}` : `fields:${JSON.stringify(fields)}`;
+  const { method = DEFAULT_METHOD } = options;
   const model = getCachedModel(
-    `${key}\u0000${method}\u0000${source}`,
+    modelKey(key, options),
     entries.flatMap((entry) => [`${entry.id}`, `${versionOf(entry)}`]),
     () =>
       createModel(
@@ -57,17 +87,22 @@ export function relatedIndex<E extends ContentEntry>(
       )
   );
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const entryOf = (id: string): E => {
+    const entry = byId.get(id);
+    if (!entry) {
+      throw new Error(
+        `astro-relatinator: internal error: ranked id "${id}" is not in the corpus`
+      );
+    }
+    return entry;
+  };
   return {
     model,
-    entries: (ids) =>
-      ids.map((id) => {
-        const entry = byId.get(id);
-        if (!entry) {
-          throw new Error(
-            `astro-relatinator: internal error: ranked id "${id}" is not in the corpus`
-          );
-        }
-        return entry;
-      }),
+    entries: (ids) => ids.map(entryOf),
+    query: ({ limit, filter }) => ({
+      limit,
+      filter: filter && ((id) => filter(entryOf(id))),
+    }),
+    idsWhere: (match) => entries.filter(match).map((entry) => entry.id),
   };
 }

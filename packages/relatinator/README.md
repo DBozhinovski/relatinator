@@ -35,7 +35,10 @@ const model = createModel([
 model.findRelated("cats"); // ["both", "dogs"]
 model.findRelatedToText("A quiet cat", { limit: 2 }); // ["cats", "both"]
 model.findRelatedToText("pets", { exclude: ["both"] }); // ["cats", "dogs"]
+model.findRelated("cats", { limit: 1, filter: (id) => id !== "both" }); // ["dogs"]
 model.getTopTerms("dogs", 3); // [{ term: "long", score: 0.96 }, ...]
+model.findRelatedScored("cats"); // [{ id: "both", score: 0.63 }, { id: "dogs", score: 0.59 }]
+model.explainRelated("cats", "both"); // [{ term: "cat", score: 0.49 }, { term: "pet", score: 0.14 }]
 model.getTopDocumentsForTerm("walking"); // ["dogs"]
 ```
 
@@ -71,19 +74,43 @@ An empty array is valid. Every query on an empty model returns `[]`.
 
 ### `RelatinatorModel`
 
-| Member                                        | Description                                                                                                  |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `method`                                      | The similarity method of the model.                                                                          |
-| `size`                                        | The number of documents.                                                                                     |
-| `has(id)`                                     | Returns `true` if the model has a document with this `id`.                                                   |
-| `findRelated(id, { limit })`                  | Uses the text of document `id` as the query. Never returns `id`. Throws if `id` is unknown.                  |
-| `findRelatedToText(text, { limit, exclude })` | Uses `text` as the query. Leaves out the ids in `exclude`.                                                   |
-| `getTopTerms(id, limit)`                      | Returns the terms with the highest weight in document `id`, as `{ term, score }`. Throws if `id` is unknown. |
-| `getTopDocumentsForTerm(term, limit)`         | Returns the documents with the highest weight for `term`.                                                    |
+| Member                                                      | Description                                                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `method`                                                    | The similarity method of the model.                                                                                            |
+| `size`                                                      | The number of documents.                                                                                                       |
+| `has(id)`                                                   | Returns `true` if the model has a document with this `id`.                                                                     |
+| `findRelated(id, { limit, exclude, filter })`               | Uses the text of document `id` as the query. Never returns `id`. Throws if `id` is unknown.                                    |
+| `findRelatedToText(text, { limit, exclude, filter })`       | Uses `text` as the query.                                                                                                      |
+| `getTopTerms(id, limit)`                                    | Returns the terms with the highest weight in document `id`, as `{ term, score }`. Throws if `id` is unknown.                   |
+| `getTopDocumentsForTerm(term, limit)`                       | Returns the documents with the highest weight for `term`.                                                                      |
+| `findRelatedScored(id, { limit, exclude, filter })`         | Returns the result of `findRelated` with the score of each id, as `{ id, score }`.                                             |
+| `findRelatedToTextScored(text, { limit, exclude, filter })` | Returns the result of `findRelatedToText` with the score of each id, as `{ id, score }`.                                       |
+| `explainRelated(id, otherId, limit)`                        | Returns the terms that give document `otherId` its score for the query `id`, as `{ term, score }`. Throws if an id is unknown. |
 
 The default `limit` is 5. The methods return results in rank order. [How scoring works](#how-scoring-works) gives the rules.
 
+The four `find` methods have the same options:
+
+| Option    | Type                      | Description                                                            |
+| --------- | ------------------------- | ---------------------------------------------------------------------- |
+| `limit`   | `number`                  | The maximum number of results. Default: 5.                             |
+| `exclude` | `readonly string[]`       | The ids to leave out of the results.                                   |
+| `filter`  | `(id: string) => boolean` | Keeps a document in the results only when the function returns `true`. |
+
+`exclude` and `filter` apply before `limit`. Thus the result has `limit` ids when enough other documents match. They do not change the weights, because the model keeps all documents. Without `exclude` and `filter`, the results are the same as in earlier 3.x versions.
+
 `getTopDocumentsForTerm` tokenizes `term` and uses the first token. If `term` has no token, for example because it is a stopword, the method returns `[]`.
+
+### Scores and shared terms
+
+Use the scored methods and `explainRelated` to find why a document is in a related list, or to improve the text of your documents.
+
+- `findRelatedScored` and `findRelatedToTextScored` return the same ids, in the same order, as `findRelated` and `findRelatedToText` with the same options. Each `score` is the score that the model uses to rank the id. [How scoring works](#how-scoring-works) gives the formula. The scores are not normalized, so do not compare the scores of different queries.
+- `explainRelated(id, otherId)` returns the terms of document `id` that also occur in document `otherId`. The `score` of a term is the part of the score of `otherId` that the term gives. It is the number of times that the term occurs in document `id`, multiplied by the weight of the term in document `otherId`.
+- `explainRelated` sorts the terms by score, highest first. Terms with equal scores are in JavaScript string order. The default `limit` is 5.
+- With `limit` set to `Infinity`, the sum of the term scores is the score of `otherId` for the query `id`. When the result of `findRelatedScored(id)` contains `otherId`, it gives the same score. The sum can be different in the last digits, because the order of the addition is different.
+- If the two documents share no term, `explainRelated` returns `[]`.
+- The terms are stems, as in `getTopTerms`.
 
 ### `tokenize(text)`
 
@@ -93,7 +120,7 @@ Returns the terms that the model uses for `text`. [How scoring works](#how-scori
 tokenize("The cats aren't sleeping"); // ["cat", "sleep"]
 ```
 
-Terms are stems, not words. Thus `getTopTerms` can return `"exampl"` for "examples".
+Terms are stems, not words. Thus `getTopTerms` and `explainRelated` can return `"exampl"` for "examples".
 
 ### `classify(topics, text, options?)`
 
@@ -165,7 +192,7 @@ The model scores documents in four steps.
    - TF-IDF: `idf(t) = 1 + ln(N / (1 + df(t)))`. The weight is `tf · idf(t)`.
    - BM25: `idf(t) = ln(1 + (N − df(t) + 0.5) / (df(t) + 0.5))`. The weight is `idf(t) · tf · (k1 + 1) / (tf + k1 · (1 − b + b · |d| / avgdl))`.
 3. **Score the documents.** The score of a document is the sum of the weights of the query terms in that document. A term that occurs two times in the query counts two times. `findRelated(id)` uses the terms of document `id` as the query. `findRelatedToText(text)` uses `tokenize(text)`.
-4. **Rank.** The model removes the query document and the ids in `exclude`. It also removes each document with a score of 0. A document that shares no term with the query has a score of 0. It sorts the other documents by score, highest first. Documents with equal scores keep their input order. The result is the first `limit` ids.
+4. **Rank.** The model removes the query document, the ids in `exclude`, and the ids that `filter` does not keep. It also removes each document with a score of 0. A document that shares no term with the query has a score of 0. It sorts the other documents by score, highest first. Documents with equal scores keep their input order. The result is the first `limit` ids.
 
 `getTopTerms` sorts the terms of a document by weight, highest first. Terms with equal weights are in JavaScript string order.
 

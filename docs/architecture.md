@@ -23,19 +23,27 @@ This document is for maintainers. It gives the reasons for the 3.x design, the c
 
 `astro-relatinator` reads entries, makes the text of each entry, and gives the text to `relatinator`.
 
-| File                   | Contents                                                                                                                        |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `src/get-related.ts`   | `getRelated()` for Astro content collections.                                                                                   |
-| `src/emdash.ts`        | `getEmDashRelated()` for EmDash collections. This file is the `astro-relatinator/emdash` entry point.                           |
-| `src/related-index.ts` | `relatedIndex()`, which both helpers call. It makes the cache key and the fingerprint, gets the model, and maps ids to entries. |
-| `src/model-cache.ts`   | `getCachedModel()`. It keeps one model for each cache key.                                                                      |
-| `src/entry-text.ts`    | The default text of an Astro entry, and the `ContentEntry` type.                                                                |
-| `src/emdash-text.ts`   | The default text of an EmDash entry.                                                                                            |
-| `src/portable-text.ts` | `portableTextToPlainText()`.                                                                                                    |
-| `src/integration.ts`   | The optional Astro integration. It only warns about 2.x options.                                                                |
-| `bench/bench.mjs`      | The benchmark of both helpers. [Automated checks](#automated-checks) describes it.                                              |
-| `bench/hooks.mjs`      | A module hook for the benchmark. It loads `bench/store.mjs` in place of `emdash` and `astro:content`.                           |
-| `bench/store.mjs`      | The in-memory collections of the benchmark.                                                                                     |
+| File                         | Contents                                                                                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/get-related.ts`         | `getRelated()` for Astro content collections.                                                                                                                     |
+| `src/get-live-related.ts`    | `getLiveRelated()` for Astro live content collections.                                                                                                            |
+| `src/astro-live-module.d.ts` | The live collection types of `astro:content` for the build. [Live collections](#live-collections-get-their-own-helper) describes them.                            |
+| `src/emdash.ts`              | `getEmDashRelated()` for EmDash collections. It keeps the last full read of each cache key for `maxAge`. This file is the `astro-relatinator/emdash` entry point. |
+| `src/related-index.ts`       | `relatedIndex()`, which all three helpers call. It makes the fingerprint, gets the model, and maps ids to entries. `modelKey()` makes the cache key.              |
+| `src/model-cache.ts`         | `getCachedModel()`. It keeps one model for each cache key.                                                                                                        |
+| `src/entry-text.ts`          | `entryText()`, the default text of an Astro entry, and the `ContentEntry` type. `src/index.ts` exports `entryText()`.                                             |
+| `src/emdash-text.ts`         | `emdashEntryText()`, the default text of an EmDash entry. `src/emdash.ts` exports it.                                                                             |
+| `src/portable-text.ts`       | `portableTextToPlainText()`.                                                                                                                                      |
+| `src/emdash-topics.ts`       | `suggestTerms()` and `topicText()`. They score the terms of EmDash taxonomies with `classify()` and find the words that matched. They do not import `emdash`.     |
+| `src/emdash-plugin.ts`       | The plugin descriptor. This file is the `astro-relatinator/emdash-plugin` entry point.                                                                            |
+| `src/emdash-plugin-entry.ts` | The route of the "Suggested topics" editor panel. This file is the `astro-relatinator/emdash-plugin/sandbox` entry point. The build bundles it into one file.     |
+| `src/integration.ts`         | The optional Astro integration. It only warns about 2.x options.                                                                                                  |
+| `scripts/bundle-sandbox.js`  | The bundle step of the plugin entry. [Compiled JavaScript and type declarations](#compiled-javascript-and-type-declarations) gives the reason.                    |
+| `scripts/check-sandbox.js`   | The sandbox check. [Automated checks](#automated-checks) describes it.                                                                                            |
+| `bench/bench.mjs`            | The benchmark of both helpers. [Automated checks](#automated-checks) describes it.                                                                                |
+| `bench/hooks.mjs`            | A module hook for the benchmark. It loads `bench/store.mjs` in place of `emdash` and `astro:content`.                                                             |
+| `bench/store.mjs`            | The in-memory collections of the benchmark.                                                                                                                       |
+| `bench/workerd/`             | The scripts of the [workerd measurement](#workerd-measurement-of-getemdashrelated). No automated check runs them.                                                 |
 
 ## Design decisions
 
@@ -45,7 +53,7 @@ In version 2.x, the integration trained one model in the Astro config process. I
 
 This design works only when pages render in the same JavaScript runtime as the Astro config. In Astro 6 and 7, pages can render in a different runtime. For example, the Cloudflare adapter prerenders pages in workerd. A page in workerd cannot read a value that the config process put on `globalThis`.
 
-In version 3.0, `createModel()` returns a model value. `relatinator` keeps no global state. Since version 3.1, its only mutable module state is the stem cache in `src/tokenize.ts`. This cache does not change an output. [Performance without output changes](#performance-without-output-changes) describes it. `astro-relatinator` builds the model on the first call, in the runtime that renders the page. Its only mutable module state is the model cache in `src/model-cache.ts`.
+In version 3.0, `createModel()` returns a model value. `relatinator` keeps no global state. Since version 3.1, its only mutable module state is the stem cache in `src/tokenize.ts`. This cache does not change an output. [Performance without output changes](#performance-without-output-changes) describes it. `astro-relatinator` builds the model on the first call, in the runtime that renders the page. Its mutable module state is the model cache in `src/model-cache.ts` and the last full read of each cache key in `src/emdash.ts`. [A freshness window, not a saved model](#a-freshness-window-not-a-saved-model) describes the second.
 
 ### Own scoring code with one runtime dependency
 
@@ -67,7 +75,7 @@ Version 3.0 uses `entry.id` for the documents, the queries, and the results. `ge
 
 `getRelated()` calls `getCollection()` each time that a page calls it. There is no build hook and no file watcher. In `astro dev`, an edit to a content file changes the `digest` of the entry. The next call then builds a new model.
 
-`getRelated()` imports `astro:content` inside the function, not at the top of the module. The Astro config imports the package to get the integration, and `astro:content` does not exist at that time. A top-level import would make the config fail. `src/emdash.ts` imports `emdash` inside the function for the same reason.
+`getRelated()` imports `astro:content` inside the function, not at the top of the module. The Astro config imports the package to get the integration, and `astro:content` does not exist at that time. A top-level import would make the config fail. `getLiveRelated()` imports `astro:content` in the same way. `src/emdash.ts` imports `emdash` inside the function for the same reason.
 
 ### The integration is optional
 
@@ -91,11 +99,15 @@ The integration now only logs a warning when it gets 2.x options. `npx astro add
 
 Both helpers call `relatedIndex()` in `src/related-index.ts`. `relatedIndex()` gets the model from `getCachedModel()` in `src/model-cache.ts`. The cache keeps one model for each key, with the fingerprint of the entries of that model. When the fingerprint for a key changes, the cache builds a new model and replaces the old one.
 
-The cache key has three parts:
+`modelKey()` in `src/related-index.ts` makes the cache key. The key has three parts:
 
-1. The corpus key. For Astro, this is the collection name. For EmDash, it is `emdash` and the collection name. Thus an Astro collection and an EmDash collection with the same name get different models.
+1. The corpus key. For Astro, this is the collection name. For an Astro live collection, it is `live` and the collection name. For EmDash, it is `emdash`, the collection name, and the locale. Thus collections of different types with the same name get different models, and each EmDash locale gets its own model.
 2. The `method`.
 3. The text source. This is the `fields` array as JSON, or the source code of the `text` function.
+
+The locale of the EmDash key is the `locale` option. Without the option, it is the locale of the EmDash request context, from `getRequestContext()`. `getEmDashCollection()` uses the same locale. The `resolveLocale()` function in emdash 1.3.1 `src/i18n/resolve.ts` selects an explicit locale first, then the locale of the request context, then the default locale when the site has more than one locale. The middleware in `src/astro/middleware/request-context.ts` puts the locale in the context only for a request with a preview token or the edit-mode cookie. Without a locale in the key, a preview in a different locale and a normal request built a new model each time they followed each other. The default locale does not change in a process, so the key does not need it.
+
+`limit` and `filter` are not a part of the key. They change only the results, not the model. `filter` gets the entry of each id through the id-to-entry map of `relatedIndex()`. The model applies it before `limit`, so the result still has `limit` entries when enough entries match.
 
 The fingerprint is a list of strings. It contains the id and then the version of each entry, in collection order. `getCachedModel()` compares the new list with the stored list, one item at a time. If the lengths are different or one item is different, the fingerprint changed. The version depends on the helper and the options:
 
@@ -104,6 +116,7 @@ The fingerprint is a list of strings. It contains the id and then the version of
 | `getRelated()`, the entry has a `digest`  | The `digest`                                      |
 | `getRelated()`, the entry has no `digest` | The default text of the entry                     |
 | `getRelated()` with `text`                | The text that `text` returns                      |
+| `getLiveRelated()`                        | The default text, or the text that `text` returns |
 | `getEmDashRelated()`                      | The default text, or the text that `text` returns |
 
 With `text`, the version is the text that `text` returns. The cache key holds only the source code of `text`. Two closures with the same source code can return different text. The returned text tells them apart.
@@ -113,6 +126,28 @@ With `text`, the version is the text that `text` returns. The cache key holds on
 Versions 3.0.0 and 3.0.1 joined the fingerprint into one string. They put U+0000 between an id and its version, and U+0001 between two entries. When an id or a text contained one of these characters, two different collections could give the same string. The cache then kept a model that was out of date. The item-by-item compare uses no separator. Two fingerprints are equal only when each id and each version are equal.
 
 The cache never removes a key. Each set of options that a site uses keeps one model for the life of the process or isolate.
+
+### Live collections get their own helper
+
+`getLiveRelated()` is a separate function from `getRelated()`. In the types that Astro 7.3.8 generates (`templates/content/types.d.ts`), the two kinds of collections have different keys and different entries:
+
+- `getCollection()` accepts `keyof DataEntryMap`. `getLiveCollection()` accepts `keyof LiveContentConfig['collections']`. These are the collections of `src/content.config.ts` and of `src/live.config.ts`.
+- At runtime, `getCollection()` throws an error for the name of a live collection. `getLiveCollection()` returns an error for the name of a content collection (`createGetCollection()` and `createGetLiveCollection()` in `dist/content/runtime.js`).
+- `getLiveCollection()` returns `{ entries, error, cacheHint }`, not an array. A live entry is a `LiveDataEntry`, with `id`, `data`, `rendered`, and `cacheHint`. It has no `digest` and no `body`. Astro 6.0.0 has the same `LiveDataEntry` type (`dist/types/public/content.d.ts:145-156` of the npm package).
+
+One function for both kinds would need a union of both key types and a conditional result type. It would also need two read paths. Two functions keep the types of `getRelated()` the same.
+
+`getLiveRelated()` uses the text as the version, because a live entry has no `digest`. The default text is the text of `data`, and then the words of `rendered.html`. A loader can return the content of an entry as HTML in `rendered.html` (`LiveDataEntry` in `dist/types/public/content.d.ts` of Astro 7.3.8 and 6.0.0). This is the place of `body` in a content collection. `getLiveRelated()` removes the tags and the content of `script` and `style` elements, It decodes the numeric entities and six common named entities, and it changes each other named entity, such as `&rsquo;`, to a space. Without this step, the tag names and the entity names, such as `strong`, `amp`, and `rsquo`, relate entries that share no words. The step uses three regular expressions, not an HTML parser, to keep the package small. It keeps the content of the other elements, such as `template`. A `>` or a `<script>` in the text of an attribute can leave part of a tag in the text or remove the words up to the next `</script>`.
+
+The result type is `LiveDataEntry<LiveLoaderDataType<C>>`. This is the entry type of `getLiveCollection(C)` in the generated types. `LiveLoaderDataType` is a type of the generated `astro:content` module without the `export` keyword. TypeScript exports all declarations of an ambient module, so a package can import it. Astro 6.0.0 has the same type (`templates/content/types.d.ts:137` of the npm package). The placeholder types of `astro/client` (`types/content.d.ts`) have no `LiveContentConfig` and no `LiveLoaderDataType`. For the build, `src/astro-live-module.d.ts` adds general forms of both types. `tsc` does not copy this file to `dist`. In a project, the generated types replace the placeholder, and the import gets the real types. Without `src/live.config.ts`, `LiveContentConfig` is `never`, and `getRelated()` users see no change.
+
+An instantiation expression, `typeof getLiveCollection<C>`, would need only the exported function. The placeholder declares `getLiveCollection` as `(...args: any[]) => any`, and TypeScript rejects type arguments for this type (TS2635). Thus the build cannot use it.
+
+`test/live-types/` is a separate TypeScript project for the type test. Its `astro-content.d.ts` has the generated helper types of Astro 7.3.8 and a `live.config.ts` with a loader type and a schema. `test/tsconfig.json` excludes this directory, because its declarations conflict with `src/astro-live-module.d.ts`. `pnpm check` runs both projects.
+
+Astro documents live collections for pages that render on demand. The runtime of Astro 7.3.8 has no prerender check in `getLiveCollection()`. In the manual check, a prerendered page called `getLiveRelated()` at build time, also without an adapter.
+
+The freshness window of `getEmDashRelated()` uses the same key. [A freshness window, not a saved model](#a-freshness-window-not-a-saved-model) describes it.
 
 ### EmDash support is a site helper, not a plugin
 
@@ -128,11 +163,54 @@ Without this rule, the text contains the bylines and the ids, and posts by the s
 
 `getEmDashRelated()` returns entries from the corpus, not the entry that the page gives. Its type parameter `D` is the type of `data` in the published entries, and the result type is `EmDashEntry<D>[]`. The entry parameter is `string | EmDashEntry<D> | EmDashEntry<Partial<D>>`. With `EmDashEntry<Partial<D>>`, a page can give only some of the keys of `D`. The `EmDashEntry<D>` member accepts no other values, but it changes inference. When TypeScript gets `D` only through `Partial<D>`, it removes the `?` modifier from each key. The `text` option gets `EmDashEntry<Partial<D>>`, because it also reads the entry object of the page. Version 3.0.0 used the type of the entry object as the result type.
 
-The model contains only published entries. `rank()` in `src/emdash.ts` selects the query by the entry id. EmDash uses the slug as the entry id, with a locale prefix when i18n routing adds one. `entryIdForRow()` in the emdash 1.2.0 `loader.ts` makes this id. A draft or preview revision takes its id from the revision slug, if the revision has one.
+The model contains only published entries. `rank()` in `src/emdash.ts` selects the query. EmDash uses the slug as the entry id, with a locale prefix when i18n routing adds one. `entryIdForRow()` in the emdash 1.3.1 `loader.ts` makes this id. A draft or preview revision takes its id from the revision slug, if the revision has one (`revisionEntry()` in `loader.ts`). A draft stages a slug change as `_slug` in the revision, and the content row keeps the old slug until the draft is published (`emdash-runtime.ts` and `createSlugChangeRedirect()` in `api/handlers/content.ts`).
 
-- If the id is in the model, `rank()` calls `findRelated(id)`. The query is the published text of that id. `rank()` does not read the text of the given object.
-- Otherwise, if the page gave an entry object, `rank()` calls `findRelatedToText()` with the text of the object. It excludes the id of the object.
-- Otherwise, if the page gave a string, `getEmDashRelated()` throws an error.
+`revisionEntry()` copies the system columns of the content row to `entry.data`, also the `id` column. Thus a draft or a preview has the same `data.id` as the published entry of the same row, also with a new slug. In emdash 1.0.0, the preview branch of `loadEntry()` in `src/loader.ts` does the same with `INCLUDE_IN_DATA`. Each locale of an entry is a separate row with its own id. The rows of the translations share `translationGroup`, not `id`.
+
+- If the page gave a string, `rank()` calls `findRelated(id)`. If the id is not in the model, `getEmDashRelated()` throws an error.
+- If the page gave an entry object, `rank()` calls `findRelatedToText()` with the text of the object. It excludes the id of the object and each corpus entry with the same `data.id`. These are the published entry itself, a preview with changes, a draft with a new slug, and a draft that was never published.
+
+For an object with the published text, `findRelatedToText()` gives the same list as `findRelated(id)`. `astro-relatinator` 3.1.0 calls `findRelated(id)` for an object whose id is in the model. Both functions tokenize the same text, and they sum the terms in the same order. These functions are in `packages/relatinator/src/model.ts`:
+
+- `score()` in `createScorer()` sums the terms in the order of the query.
+- For `findRelated()`, the query is the indexed document. `termCounter()` keeps its terms in the order of their first occurrence.
+- For `findRelatedToText()`, `queryOf()` makes the query. It keeps the order of `countTerms()`, which is also the order of the first occurrence.
+
+The tests "ranks each published entry object as its id, with ties and limit %s" and "ranks each published entry object as its id, with close scores and limit %s" in `test/emdash.test.ts` check this, with `limit` 6 and 100. In the corpus with close scores, a different order of the terms in the sum changes the list. The cost is one text and one tokenization of the object for each call.
+
+In emdash 1.3.1, the collection read of a preview request serves the draft of the previewed entry, and the read of an edit-mode request serves all drafts (`draftRevisions` in `getEmDashCollectionUncached()` in `query.ts`, and `loadDraftRevisions()` in `loader.ts`). A call in these requests does not use a window. Thus the corpus contains the draft text, and the object has the same text. The text of the object changes the list in these cases:
+
+- With emdash 1.0.0. Its middleware also sets `preview` and `editMode` in the request context (`src/astro/middleware/request-context.ts`). But its collection read does not serve drafts (`getEmDashCollectionUncached()` in `src/query.ts` and `loadCollection()` in `src/loader.ts`). Only `getEmDashEntry()` serves the draft of a preview, through `loadEntry()` in `src/loader.ts`. Thus the object of a preview has a different text than the corpus.
+- In a request that is not a preview or edit mode, when the object has a different text than the corpus. Examples are an object that the page changes, and an entry that changed after the read of a `maxAge` window.
+
+### A freshness window, not a saved model
+
+On EmDash, most of the time of a call with a cached model is the change check, not the model. The [workerd measurement](#workerd-measurement-of-getemdashrelated) gives these values for 1,005 posts:
+
+- A first call took 1,042 ms. The model build took 831 ms of this time.
+- A later call took 274 ms. The read of the collection took 251 ms, and the text for the fingerprint took 18 ms. `findRelated()` took 2 to 3 ms.
+- The same page without the call took 37 ms.
+
+A saved model, for example in Workers KV, removes only the model build of a first call. A later call still reads the collection and makes the text of each entry, because the change check needs them. Thus a saved model does not make the 274 ms shorter. A saved model also needs a serialized format, a version check of that format, and a storage binding. The package does not have a saved model.
+
+`maxAge` removes the change check for a number of seconds. In the second run of the measurement, a later call inside a 60-second window took 2 ms. The page took 12 ms, the same time as the page without the call. With `maxAge` 0, the later call took 215 ms.
+
+These rules apply:
+
+- The default is 0. A call with `maxAge` 0 reads the collection and makes the text of each entry, as before. Its output does not change.
+- The window state is the `recentReads` map in `src/emdash.ts`. For each cache key, it keeps the time of the last full read and the index of that read: the model and the entries. Thus the model, the result entries, and the entries that `filter` gets come from the same read. `getCachedModel()` does not change.
+- The key of the map is the key of the model cache, from `modelKey()`. Thus one function makes both keys. A call for a different collection, locale, `method`, or text source does not use the window.
+- A call with `maxAge` above 0 keeps its full read. A call with `maxAge` 0 updates the read only if the key already has one. Thus a site without `maxAge` keeps no entries in memory.
+- A call in a preview request or in edit mode does not use a window and does not keep its read. In emdash 1.3.1, the read of a preview request contains the draft of the previewed entry, and the read in edit mode contains all drafts. A window with such a read would show drafts on public pages. The call reads `preview` and `editMode` from `getRequestContext()`. The test "does not start a window in edit mode" in `test/emdash.test.ts` showed the leak before this rule: after an edit-mode read, a public call inside the window returned the list of the draft. Other tests in the same file check a preview or edit-mode call while a public window exists, with `maxAge` 0 and 60.
+- The window starts when the read starts. A call inside the window does not move it. At exactly `maxAge` seconds, the call reads the collection again.
+- In a request that is not a preview or edit mode, an entry object uses the model of the window and its own text, as without a window.
+- A `maxAge` value that is not a number from 0 causes a `RangeError`, as the `ratio` of `classify()` does. `Infinity` is valid. It keeps the first read for the life of the process or isolate.
+- The clock is `Date.now()`. In workerd, `Date.now()` changes only at I/O, so it does not change while code runs. It changes between requests, so the window ends between requests.
+- Each process or isolate has its own window. The package does not share a window between isolates.
+
+The window does not compare texts. Two `text` functions with the same source code have the same cache key. Inside a window, the second function gets the model of the first. Without a window, the fingerprint tells them apart.
+
+`getRelated()` has no `maxAge`. The `digest` of each entry makes its change check fast. In the [3.1.0 benchmark](../packages/astro-relatinator/CHANGELOG.md#310---2026-10-16), a later call took 0.65 ms for 1,005 posts.
 
 ### Compiled JavaScript and type declarations
 
@@ -141,6 +219,10 @@ Version 2.x of `astro-relatinator` published its TypeScript source, `integration
 JavaScript loads in every runtime and tool without a TypeScript step. Node.js does not strip types from files in `node_modules`. Node.js 24.13.1 stops with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. Also, the compiler options of a consumer do not apply to the source of the package.
 
 `relatinator` 2.x used Vite library mode and `dts-bundle-generator`. Version 3.0 uses only `tsc`, which makes one output file for each source file.
+
+One output file is an exception. In `sandboxed: []`, EmDash reads the entry file of a plugin with `readFileSync()` and gives the code to the sandbox runner as one module (emdash 1.3.1 `generateSandboxedPluginsModule()` in `virtual-modules.ts`). The Cloudflare runner loads this code as the `sandbox-plugin.js` module of a Worker Loader worker. That worker has no other module, so an import in the code fails. Thus, after `tsc`, `scripts/bundle-sandbox.js` bundles `src/emdash-plugin-entry.ts` with esbuild and writes over `dist/emdash-plugin-entry.js`. The bundle contains `relatinator`, `wink-porter2-stemmer`, and the other files of the package. Its format is ES modules, its platform is `neutral`, and its target is the `target` of `tsconfig.json`. `tsc` still makes `dist/emdash-plugin-entry.d.ts`. The official EmDash plugins also publish one file with no imports for their `./sandbox` export, made by `@emdash-cms/plugin-cli`. The package does not use `@emdash-cms/plugin-cli`, because it builds the whole package with its own tools.
+
+EmDash finds the entry file with `require.resolve()` from the site (`resolveModulePathFromProject()` in `virtual-modules.ts`). This call does not match the `import` condition of an `exports` map. Thus the `./emdash-plugin/sandbox` export has a `default` condition.
 
 ### TypeScript 6.0.3 in every package
 
@@ -176,6 +258,18 @@ Three checks enforce the rule:
 
 After these changes, `tokenize()` takes most of the build time. In the benchmark on 2026-10-16, `tokenize()` for 1,005 posts took 0.29 s, and `createModel()` took 0.34 s. Thus a faster build needs a faster `tokenize()`.
 
+### Filters apply before the limit
+
+Version 3.3 adds `filter` to both queries, and `exclude` to `findRelated()`. `rank()` in `src/model.ts` gets one function that keeps an id or not. It removes the query document, the ids in `exclude`, and the ids that `filter` does not keep. `topIndices()` calls it only for a document that has a score above 0 and that enters the top list. Thus a filtered list still has `limit` ids when enough documents match. Without `exclude` and `filter`, the function removes only the query document, as the `Set` of 3.0.0 did. The equivalence test with 3.0.0 still passes.
+
+### Scores and shared terms from the ranking code
+
+Version 3.3 adds `findRelatedScored()`, `findRelatedToTextScored()`, and `explainRelated()`. They show why two documents are related. `rank()` in `src/model.ts` now returns the indices of the ranked documents, not their ids. Each query and its scored form use the same `rank()` call. The query changes the indices to ids. The scored form also reads the score of each index from the score array of the query. Thus the scored form has the same ids, the same order, and the same floating-point scores as the ranking.
+
+`explainRelated(id, otherId)` reads the terms of document `id`. For each term that `otherId` also contains, it multiplies the count of the term in `id` by the weight of the term in `otherId`. The weight comes from the same function as the weight in the postings. These products are the summands of the score of `otherId`. `explainRelated()` sorts them as `getTopTerms()` does, so their sum can differ from the score in the last digits. `test/model.test.ts` compares the sum with the score with `toBeCloseTo()`.
+
+Version 3.0.0 does not have the three methods. The equivalence test ignores them in its check of the model keys, and its probes do not call them. The outputs of the other members do not change.
+
 ### Topics from a fixed list, scored by their descriptions
 
 `classify()` chooses topics from a list that a person writes. It does not make new tags. [Issue #6](https://github.com/DBozhinovski/relatinator/issues/6) gives the reasons. In short, tags made from the words of a post were rare words or noise, and they repeated what related posts already do.
@@ -207,35 +301,71 @@ Two other methods did not help, and `relatinator` does not have them:
 - **Pseudo-relevance feedback.** This method added the top terms of the posts that matched a topic best to its description. The mean F1 was 0.67 without it and 0.54 to 0.68 with it. The feedback posts were often wrong, and the top terms of a post were words of that post only.
 - **A part-of-speech filter.** A filter with the compromise library kept only nouns. It made topics from the words of the posts better, from a mean best F1 of 0.68 to 0.73. But it adds 120 KB (gzipped) and works only with English.
 
+### EmDash terms as topics, in an editor panel
+
+The `astro-relatinator/emdash-plugin` plugin suggests taxonomy terms for a saved entry. It closes the item "EmDash terms are not topics yet" of [issue #6](https://github.com/DBozhinovski/relatinator/issues/6). It does not change the site helper. [EmDash support is a site helper, not a plugin](#emdash-support-is-a-site-helper-not-a-plugin) still applies to related content.
+
+The plugin is different from related content in three ways. It reads one entry and the terms of its taxonomies, not the whole collection. It writes only when a user selects terms. Its result is for the user, not for a page of the site.
+
+**The standard format.** The descriptor sets `format: "standard"`. The entry file default-exports `{ routes }`, and EmDash calls each route with `(routeCtx, ctx)`. emdash 1.3.1 accepts a standard plugin in `plugins: []` and in `sandboxed: []`. A native plugin can run only in `plugins: []`. A standard plugin cannot get options from the descriptor. The `options` field of `PluginDescriptor` is for native plugins only. Thus the only option is `collections`, which goes into the descriptor itself.
+
+The plugin runs in `plugins: []` and in `sandboxed: []`. For `sandboxed: []`, the entry file must be one module with no imports. [Compiled JavaScript and type declarations](#compiled-javascript-and-type-declarations) tells how the build makes it. In the sandbox, the bridge of the runner gives `ctx.content` and `ctx.taxonomies` to the route, and it checks the capabilities of the descriptor. `taxonomies:write` includes `taxonomies:read` (`PLUGIN_CAPABILITY_IMPLICATIONS` in emdash 1.3.1 `plugins/types.ts`).
+
+**The route permission.** A route without a permission requires `plugins:manage`. The panel route sets `content:edit_own`, so the users with this permission can use it. Contributors have only `content:edit_own_drafts` and cannot use it. EmDash then checks that the user can edit the entry (`requireOwnerPerm()` in `http-route-dispatch.ts`). The permission is in two places. The entry route has it for `plugins: []`, and the descriptor `routes` list has it for `sandboxed: []`.
+
+The route reads the entry from `routeCtx.ui.entry`. EmDash sets this value only for a request through the editor panel endpoint, after the checks. A direct call to the plugin route has no `ui.entry`, and the route returns status 400. The route also does not trust the submitted term ids. It adds only the ids that are terms of that taxonomy and that the entry does not have yet.
+
+**Tag = slug.** Each term becomes one topic. The tag is the term slug. EmDash keeps the slug unique for each taxonomy and locale, but two terms can have the same label. `classify()` throws an error for two equal tags, so the label cannot be the tag. The description is the label and `data.description`, because the label is the best short description of a term. `classify()` runs one time for each taxonomy. Thus the same slug in two taxonomies does not give equal tags, and the relative cut compares only the terms of one taxonomy.
+
+**No labels of the assigned terms in the text.** The default EmDash text contains the labels of the terms of the entry. [EmDash support is a site helper, not a plugin](#emdash-support-is-a-site-helper-not-a-plugin) gives the reason. For suggestions, these labels are wrong. Each assigned term matches its own label and can get the best score. The relative cut then removes the other terms, and the panel removes the assigned term. The result is no suggestion. `topicText()` removes `terms` from the data before it makes the default text. In emdash 1.3.1, `ctx.content.get()` does not put `terms` into the data. The rule keeps the text correct if a later EmDash version adds it.
+
+The assigned terms stay in the `classify()` call. The panel removes them from the result. Thus the cut is the same as for an entry without terms, and an assigned term can use one of the 3 places of `limit`.
+
+**Matched words, not a percent.** Each suggestion shows the term label and up to 3 words of the entry that matched the term, for example "supertokens: supertokens, authenticated, providers". The first version of the panel showed the score as a percent of the best score in the taxonomy. A test on 2026-10-19 used a copy of darko.io with 37 posts and 80 tag terms with descriptions. The percent did not show a bad suggestion. The best term always has 100%. For a post about a related-post classifier, the panel showed "guest (100%)". The matched words made good and bad suggestions clear:
+
+- supertokens: supertokens, authenticated, providers (a post about authentication)
+- guest: post, blog, published (the post about a related-post classifier)
+
+The words also show which description to change. The words of "guest" are general words that most blog posts contain.
+
+The words come from the same text and the same weights as the score. `suggestTerms()` builds a model of the topic documents of one taxonomy with `createModel()`. These are the documents of `classify()`, so each term has the weight that gave the score. The part of a term in the score is its count in the text times its weight in the topic document. The words are the 3 terms with the largest parts, and for equal parts, the first stem in alphabetical order. The text is the text of `topicText()`, without the labels of the assigned terms. Each stem shows as the first word of the text with that stem, in lower case. The words follow the split rule of `tokenize()`. `tokenize()` removes elisions before it splits, so "won't" gives the stem "wo". Thus the words split the text at each character that is not a letter, a digit, or an apostrophe. They split a piece at its apostrophes only when the piece gives more than one token. The word "won't" then shows as "won't", not as "wo". An ending such as "'s" goes away when the word without it gives the same stem, so "conference's" shows as "conference".
+
+A first prototype added the text to the topic model as one more document and called `explainRelated()`. That document changes the weights of the terms. On the darko.io data, the two methods gave 92 suggestions. The prototype gave different words for 4 of them, and the same words in a different order for 9. The model of the topic documents has no document for the text, so it needs no id for the text. Thus the text cannot collide with a term slug.
+
+A Block Kit checkbox option has only `label` and `value` in emdash 1.3.1 (`CheckboxElement` in `@emdash-cms/blocks`). Thus the words go into the label, after a colon. This change adds `createModel()` to the sandbox bundle. The bundle grew from 26306 to 31941 bytes.
+
+**Taxonomies only.** The plugin reads the terms of the taxonomies of the collection. It does not read other fields. darko.io kept its tags in a `multiSelect` field. On that site, the panel showed "No terms" until the tags were terms of a taxonomy. The README tells sites to move the tags to a taxonomy and to read the terms in their templates.
+
 ## Verification
 
 This section lists the checks behind the claims in the READMEs. There are two types of checks:
 
 - Automated checks are scripts in this repository. No CI runs them. Run them by hand before a release.
-- Manual checks ran one time, during the 3.0 work on 2026-10-15 and during the 3.1 work on 2026-10-16. The repository has no scripts for them. The procedures below repeat the consumer builds, the Cloudflare check, and the EmDash check. The negative control, the 2.x baseline, and the 3.1 checks have no written procedure.
+- Manual checks ran one time, during the 3.0 work on 2026-10-15, during the 3.1 work on 2026-10-16, and during the topic plugin work, the live collection work, the workerd measurement, the preview work, and the sandbox work on 2026-10-19. Only the workerd measurement has scripts in the repository, in `packages/astro-relatinator/bench/workerd`. The procedures below repeat the consumer builds, the Cloudflare check, the EmDash check, the live collection check, the preview check, the workerd measurement, and the sandbox check. The negative control, the 2.x baseline, the 3.1 checks, and the topic plugin checks have no written procedure.
 
 ### Automated checks
 
 Run these commands from the repository root. The results are from 2026-10-16, with Node.js 24.13.1 and pnpm 11.24.0. A result that gives another date is from that date.
 
-| Command                                                    | What it checks                                                                                                                                                                                                                                                                                                                                                   | Result on 2026-10-16                                                                                                                                                                                                |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests both helpers, the text rules, the cache, and the types of `getEmDashRelated()`.                                                                                                       | 144 tests in `relatinator` and 50 in `astro-relatinator` on 2026-10-17. `test/classify.test.ts` has 19 of them.                                                                                                     |
-| `pnpm --filter relatinator test equivalence`               | Runs only `test/equivalence.test.ts`. It compares the results, the scores, the tie order, and the errors of `src` with `relatinator` 3.0.0. The inputs are synthetic corpora, the fixture posts, the playground posts, seven option sets, `limit` values next to 64, odd `limit` values, more than 100,000 different words, and strings with Unicode edge cases. | 63 tests.                                                                                                                                                                                                           |
-| `pnpm check`                                               | `tsc` checks the source and the tests of both libraries. `astro check` checks the playground.                                                                                                                                                                                                                                                                    | No errors. `astro check` reports 0 errors.                                                                                                                                                                          |
-| `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                        | 9499 bytes (9.3 KB), no imports, on 2026-10-17.                                                                                                                                                                     |
-| `pnpm build`                                               | Builds both libraries and the playground.                                                                                                                                                                                                                                                                                                                        | The playground has 7 pages.                                                                                                                                                                                         |
-| `pnpm -r --if-present run format:check`                    | Runs Prettier in both libraries.                                                                                                                                                                                                                                                                                                                                 | No changes. Each package prints one deprecation warning.                                                                                                                                                            |
-| `pnpm --filter relatinator bench --impl both --sizes 1005` | Builds `relatinator`. Then it times the model build, the queries, and `tokenize()` of 3.1 and 3.0.0 on 1,005 synthetic posts, in 5 runs. Each run starts a new Node.js process. The last line tells if the output checksums of all runs agree.                                                                                                                   | The checksums agree, and no call failed. The [3.1.0 changelog](../packages/relatinator/CHANGELOG.md#310---2026-10-16) gives the times.                                                                              |
-| `pnpm --filter astro-relatinator bench`                    | Builds both libraries. Then it calls `getEmDashRelated()` and `getRelated()` on 1,005 synthetic posts in memory, in 5 runs. It times the first call, the later calls, and the text of all entries. `--dist` sets the directory of the helpers. The changelog tells how to time 3.0.1.                                                                            | No call failed. Each helper gave one checksum in all runs. The published 3.0.1 package gave the same checksums. The [3.1.0 changelog](../packages/astro-relatinator/CHANGELOG.md#310---2026-10-16) gives the times. |
+| Command                                                    | What it checks                                                                                                                                                                                                                                                                                                                                                                                       | Result on 2026-10-16                                                                                                                                                                                                |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, the scores and shared terms, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests the three helpers, the text rules and the exported text functions, the cache, the `maxAge` window, the types of `getEmDashRelated()` and `getLiveRelated()`, and the topic plugin.           | 203 tests in `relatinator` and 127 in `astro-relatinator` on 2026-10-19. `test/classify.test.ts` has 19 of them.                                                                                                    |
+| `pnpm --filter relatinator test equivalence`               | Runs only `test/equivalence.test.ts`. It compares the results, the scores, the tie order, and the errors of `src` with `relatinator` 3.0.0. The inputs are synthetic corpora, the fixture posts, the playground posts, seven option sets, `limit` values next to 64, odd `limit` values, more than 100,000 different words, and strings with Unicode edge cases.                                     | 63 tests.                                                                                                                                                                                                           |
+| `pnpm check`                                               | `tsc` checks the source and the tests of both libraries, also the `test/live-types` project. `astro check` checks the playground.                                                                                                                                                                                                                                                                    | No errors. `astro check` reports 0 errors.                                                                                                                                                                          |
+| `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                                                            | 10131 bytes (9.9 KB), no imports, on 2026-10-19.                                                                                                                                                                    |
+| `pnpm --filter astro-relatinator test:sandbox`             | Builds `astro-relatinator`. Then it bundles `dist/emdash-plugin-entry.js` again with esbuild, with each import as external, and fails if the file has an import, an `export ... from`, an `import()`, or a `require()`. It also fails if `require.resolve("astro-relatinator/emdash-plugin/sandbox")` gives another file, or if the file does not default-export the panel route. `prepack` runs it. | 31941 bytes, no imports, on 2026-10-19. On the `tsc` output without the bundle step, it failed with `imports other modules: ./emdash-topics.js`.                                                                    |
+| `pnpm build`                                               | Builds both libraries and the playground.                                                                                                                                                                                                                                                                                                                                                            | The playground has 7 pages.                                                                                                                                                                                         |
+| `pnpm -r --if-present run format:check`                    | Runs Prettier in both libraries.                                                                                                                                                                                                                                                                                                                                                                     | No changes. Each package prints one deprecation warning.                                                                                                                                                            |
+| `pnpm --filter relatinator bench --impl both --sizes 1005` | Builds `relatinator`. Then it times the model build, the queries, and `tokenize()` of 3.1 and 3.0.0 on 1,005 synthetic posts, in 5 runs. Each run starts a new Node.js process. The last line tells if the output checksums of all runs agree.                                                                                                                                                       | The checksums agree, and no call failed. The [3.1.0 changelog](../packages/relatinator/CHANGELOG.md#310---2026-10-16) gives the times.                                                                              |
+| `pnpm --filter astro-relatinator bench`                    | Builds both libraries. Then it calls `getEmDashRelated()` and `getRelated()` on 1,005 synthetic posts in memory, in 5 runs. It times the first call, the later calls, and the text of all entries. `--dist` sets the directory of the helpers. The changelog tells how to time 3.0.1.                                                                                                                | No call failed. Each helper gave one checksum in all runs. The published 3.0.1 package gave the same checksums. The [3.1.0 changelog](../packages/astro-relatinator/CHANGELOG.md#310---2026-10-16) gives the times. |
 
 The benchmark times depend on the machine and its load. For the results above, `taskset -c 3` kept each benchmark on one CPU core.
 
-All 194 tests pass. The type assertions in `test/emdash-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
+All 330 tests pass on 2026-10-19. The type assertions in `test/emdash-types.test.ts`, `test/public-entry-text.test.ts`, and `test/live-types/live-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
 
 ### Playground related lists
 
-The playground is the manual check for changes that affect Astro. Run `pnpm build`. Then compare the related lists in the build output with the [expected related lists](../packages/playground/README.md#expected-related-lists). The playground README has a command that prints the lists. On 2026-10-16, all six lists matched.
+The playground is the manual check for changes that affect Astro. Run `pnpm build`. Then compare the related lists in the build output with the [expected related lists](../packages/playground/README.md#expected-related-lists). The playground README has a command that prints the lists. On 2026-10-16, all six lists matched. Also compare the topics with the [expected topics](../packages/playground/README.md#expected-topics). On 2026-10-19, all six lists and all six topic lists matched.
 
 ### Manual checks during the 3.0 work
 
@@ -286,13 +416,178 @@ These checks compared version 3.1 with `relatinator` 3.0.0 and `astro-relatinato
 | Text. The inputs are random EmDash and Astro entries, also entries with odd shapes. The check compares the outputs and the errors of the text functions with 3.0.1.                                                                                                                                               | 0 differences in 1,000,000 comparisons.              |
 | Cache. The check makes 40,000 random changes to a collection. One half of the run also uses ids and texts with U+0000 and U+0001. The check compares each decision to build a new model with 3.0.1.                                                                                                               | 0 differences.                                       |
 
+### Manual check of the topic plugin
+
+This check ran on 2026-10-19. It used `npm create emdash@1.3.1` with the `node:blog` template, `emdash` 1.3.1, Astro 7.4.0, and the packed tarballs of `relatinator` 3.2.0 and `astro-relatinator`. The config had `plugins: [relatinatorTopics()]`. After the dev-bypass setup, the check called the panel endpoint `POST /_emdash/api/content/posts/{id}/plugin-extensions/relatinator-topics/panel/suggested-topics` with the session cookie and the `X-EmDash-Request: 1` header.
+
+- The manifest listed the "Suggested topics" panel.
+- `panel_load` gave the expected blocks for each of the 8 seeded posts. Three posts got suggestions, and five posts got "No suggestions". The seed terms have no descriptions, so each response had the description hint.
+- `form_submit` with one suggested tag added that tag to the entry. The response had the toast "Added 1 term." and the new blocks. The terms API of the entry then listed the new tag.
+- A request without the header got status 403. A request without the cookie got status 401. A direct call to `/_emdash/api/plugins/relatinator-topics/panel` got status 400.
+
+A second check on the same day drove the admin UI in Chromium with Playwright:
+
+- The "Suggested topics" panel showed in the sidebar of the post editor. It listed "Design (100%)" under Categories and "Tools (100%)" under Tags. A click on "Add selected terms" added the selected term and showed the toast.
+- With `refresh: true`, the Categories field of the editor did not show the new term. emdash 1.3.1 `handlePluginEntryRefresh` in the admin reloads the `content`, `revisions`, and `translations` queries, but not the `entry-terms` queries of that field. The field saves its whole list. A removal of the old term in the field then removed the new term too. The terms API showed no categories after that removal.
+- The panel now returns `navigate` to the same entry instead of `refresh`. The admin then loads the page again with `window.location.assign()`. After the add, the Categories field showed both terms. A removal of the old term kept the new term.
+- An edit of the post title saved automatically within 3 seconds. The Save button then showed "Saved".
+- The browser console showed a React warning that a `form` is inside a `form`. The admin puts the Block Kit form of the panel inside the editor form. The submit of the panel did not submit the editor form.
+
+These two checks ran on the code that showed a percent. A third check on 2026-10-19 ran the matched words. It used a copy of darko.io with emdash 1.3.1, Astro 7.3.8, 37 published posts, and 80 tag terms with descriptions. The check packed the tarball of `astro-relatinator` from the working tree of this change. Earlier checks in the admin UI had changed the assigned terms of some posts, and the check used the terms as they were. `panel_load` gave status 200 for each of the 37 posts. 23 posts got "No new suggestions", and 14 posts got 22 suggestions. Some results:
+
+- self-hosting-with-coolify-and-hetzner: "No new suggestions". Assigned terms: cloudflare-tunnels, coolify, devops, hetzner, infrastructure, self-hosting.
+- build-you-a-related-post-classifier: "guest: post, blog, published", "rest: post, get, api", "shorts: post, note, quick". Assigned terms: astro, nlp.
+- inside-the-cfp: "year-in-review: reviewers, year, look", "conference: talks, conference, speakers". Assigned terms: cfp, community, conferences, whatthestack.
+- find-your-tribe: "beerjs: community, network, organism". Assigned terms: community, devrel.
+- but-auth-is-hard: "supertokens: supertokens, authenticated, providers". Assigned terms: auth, express, foss, node, oauth2, oidc, php.
+- wts-the-third: "conference: conferences, speakers, events", "cfp: conferences, speakers, cfp". Assigned terms: community, conferences, whatthestack.
+
+An earlier run in Chromium, on the tarball before the tokenizer rule of the matched words, showed the same labels for build-you-a-related-post-classifier.
+
+The same check ran on a copy of darko.io with emdash 1.2.0 and `plugins: [relatinatorTopics()]`. `astro dev` started with no error and no warning about the plugin. The admin manifest listed the "Suggested topics" panel, and the editor showed it. `panel_load` gave status 200 and "No terms", because this copy kept its tags in a `multiSelect` field. No check added a term with emdash 1.2.0.
+
+### Manual check of the topic plugin in the sandbox
+
+This check ran on 2026-10-19. It used a copy of the site of the [workerd measurement](#workerd-measurement-of-getemdashrelated): the EmDash Cloudflare blog template with emdash 1.3.1, `@emdash-cms/cloudflare` 1.3.1, Astro 7.4.0, `@astrojs/cloudflare` 14.4.0, wrangler 4.151.1, and workerd 1.20261012.1, with a local D1 database. The database had the 7 posts and the draft of the template. The packed tarballs of `relatinator` 3.2.0 and `astro-relatinator` were from the working tree of this change. The procedure: The Worker Loader binding is a binding of the Workers paid plans. The doc comment of `sandbox()` in `@emdash-cms/cloudflare` 1.3.1 (`dist/index.d.mts`) says: "Without that paid-plan binding, sandboxed plugins are disabled at build time."
+
+1. In `wrangler.jsonc`, add `"worker_loaders": [{ "binding": "LOADER" }]`.
+2. In `astro.config.mjs`, add `sandboxed: [relatinatorTopics()]` and `sandboxRunner: sandbox()` to the EmDash options. `sandbox()` is from `@emdash-cms/cloudflare`.
+3. Start `astro dev` and get a session cookie from `POST /_emdash/api/auth/dev-bypass`. This route works only in dev mode.
+4. Call the panel endpoint `POST /_emdash/api/content/posts/{id}/plugin-extensions/relatinator-topics/panel/suggested-topics` with the cookie and the `X-EmDash-Request: 1` header.
+5. Run `astro build` and `astro preview`, and call the endpoint again with the same cookie. Local workerd keeps the session between the two servers.
+
+The results:
+
+- In both servers, the log (`.astro/dev.log` and `.astro/preview.log` of the site) showed `EmDash: Loaded sandboxed plugin relatinator-topics:3.1.0 with capabilities: [content:read, taxonomies:write, taxonomies:read]`. In `astro dev`, the manifest listed the plugin with `"sandboxed": true` and the "Suggested topics" panel.
+- In `astro dev`, `panel_load` gave status 200 for each of the 8 posts. Three posts got suggestions, four posts got "No new suggestions", and the draft got "No suggestions". Each response had the description hint, because the seed terms have no descriptions.
+- A second run in `astro dev` on the same day saved each response. `panel_load` for `notes-on-simplicity` suggested the "Design" category. `form_submit` with that category gave status 200, the toast "Added 1 term.", and `navigate` to the entry. The category terms of the entry (`GET /_emdash/api/content/posts/{id}/terms/category`) changed from `notes` to `design` and `notes`.
+- In `astro preview`, the log showed that the plugin loaded. No output of the preview requests was saved, so this record does not give their results.
+- In `astro dev`, a request without the header got status 403, and a request without the cookie got status 401. In `astro dev`, a direct call to `/_emdash/api/plugins/relatinator-topics/panel` got status 400. In the sandbox, the error code is `ROUTE_ERROR`, and the message is `PluginRouteError: Open this panel from the entry editor.`
+
+Two negative controls ran in the same site, with `astro build` and `astro preview`. With the `exports` map of the commit before this change, `astro build` failed with `Package subpath './emdash-plugin/sandbox' is not defined by "exports"`, from `resolveModulePathFromProject()`. With the new `exports` map and the `tsc` output of the entry file, the build passed. The plugin loaded, but `panel_load` got status 400 with `Failed to start Worker: Uncaught Error: No such module "emdash-topics.js". imported from "sandbox-plugin.js"`.
+
+### Manual check of live collections
+
+This check ran on 2026-10-19. It used a new Astro 7.3.8 site with `@astrojs/node` 11.1.8 in `standalone` mode and the packed tarballs of `relatinator` 3.2.0 and `astro-relatinator`. `src/live.config.ts` had one live collection, `products`, with four entries from a loader in memory. The loader added a call count to the data of each entry. The pages called `getLiveRelated("products", ..., { fields: ["title", "text"] })`.
+
+- `astro check` reported 0 errors. A test file with `const wrong: number = related[0]!.data.title` and `getLiveRelated("posts", "a")` got two errors: `Type 'string' is not assignable to type 'number'` and `Argument of type '"posts"' is not assignable to parameter of type '"products"'`.
+- `astro build`, then `node dist/server/entry.mjs`. The on-demand page `/products/telescope` showed the related list "Star map", "Moon lamp". `/products/star-map` showed "Telescope". The call count of the loader was 1, 2, and 3 in three requests, so each request loaded the collection again.
+- The prerendered page `/static/telescope/` showed "Star map", "Moon lamp" in the build output. A second build without an adapter also prerendered this page with the same list.
+
+To repeat the check:
+
+1. Pack the two libraries, as in step 1 of the consumer builds.
+2. Make a new Astro 7.3.8 project. Install the two tarballs and `@astrojs/node`. Set `adapter: node({ mode: "standalone" })`.
+3. Add `src/live.config.ts` with a live collection and a loader. Add a page with `export const prerender = false` that calls `getLiveRelated()`.
+4. Run `astro check` and `astro build`. Start `node dist/server/entry.mjs` and open the page.
+
+### Manual check of previews and drafts
+
+This check ran on 2026-10-19. It used the EmDash blog template with emdash 1.3.1, SQLite, `@astrojs/node`, and `astro dev`. The packed tarballs of `relatinator` 3.2.0 and `astro-relatinator` were installed. The post page called `getEmDashRelated("posts", post, { limit: 5, maxAge })` with the entry from `getEmDashEntry()`. A `maxAge` query parameter set `maxAge`, with 0 as the default. The check used the "The Case for Static" post. A second run used the tarball of the commit before the preview work. Both runs used code from before the `shared` rule in `publishedIndex()`. Thus in these runs, a preview call could use a window and keep its read in the window.
+
+The admin API made the preview URL and the drafts. `POST /_emdash/api/content/posts/{id}/preview-url` returns a URL with a signed `_preview` token. The `[id]` is the id of the content row. A state-changing request needs the `X-EmDash-Request: 1` header. `GET /_emdash/api/auth/dev-bypass` signs in on a dev server. A `PUT` to the entry with new `data` saved a draft revision. The entry stayed published.
+
+| Case                                                  | Commit before the preview work | Preview work             |
+| ----------------------------------------------------- | ------------------------------ | ------------------------ |
+| Public page, before and after the draft               | Published list (P)             | P                        |
+| Preview of a draft with new text, `maxAge` 0          | Draft list (D)                 | D                        |
+| Same preview, inside a window from a public read      | P                              | D                        |
+| Preview of a draft with a new slug, inside the window | The old slug is first          | P, without the old slug  |
+| Public page inside the window, after a preview read   | Not checked                    | Draft text and its title |
+
+P was `notes-on-simplicity`, `designing-with-constraints`, `a-weekend-with-a-side-project`, `small-tools-big-impact`, `building-for-the-long-term`. The draft had the content of "Learning in Public". D started with `learning-in-public`. The draft with the new slug had the published content. Its preview had the entry id `the-case-for-static-sites` and the `data.id` of the content row. The last row shows the leak of the old code. The `shared` rule removes this leak, and the check below ran on the final code.
+
+A second check ran on 2026-10-19, on the final code. It used an EmDash blog site with emdash 1.3.1 and `@astrojs/node`, on the dev server. The tarballs were packed from the working tree of this change. The post page called `getEmDashRelated("posts", post, { limit: 5, maxAge })`. A `maxAge` query parameter set `maxAge`.
+
+1. A request opened the preview URL of `the-case-for-static` with `maxAge=600`. The title of the draft is "Static sites, learned in public". The page showed this title. The related list was `learning-in-public`, `building-for-the-long-term`, `a-weekend-with-a-side-project`, `notes-on-simplicity`, `small-tools-big-impact`.
+2. Then two public requests opened `/posts/learning-in-public?maxAge=600`, inside the same window. Each page showed `building-for-the-long-term`, `a-weekend-with-a-side-project`, `notes-on-simplicity`, `small-tools-big-impact`, `the-case-for-static`. The title of `the-case-for-static` was the published title "The Case for Static". The draft title occurred 0 times in the two responses.
+
+To repeat the check:
+
+1. Pack the two libraries, as in step 1 of the consumer builds. Install the tarballs in an EmDash site.
+2. Call `getEmDashRelated()` in the post page with the entry from `getEmDashEntry()`, and render the ids.
+3. Save a draft of a published post, and make a preview URL. Open the public page and the preview URL with and without a `maxAge`.
+
+### Workerd measurement of `getEmDashRelated()`
+
+This measurement ran on 2026-10-19, in two runs. It times `getEmDashRelated()` in the post page of an EmDash site on the Cloudflare adapter. `astro preview` runs the built worker in local workerd, with a local D1 database.
+
+**Environment.** The site came from `npm create emdash@1.3.1` with the `cloudflare:blog` template. The versions were `emdash` 1.3.1, `@emdash-cms/cloudflare` 1.3.1, Astro 7.4.0, `@astrojs/cloudflare` 14.4.0, `wrangler` 4.151.1, and `workerd` 1.20261012.1. Node.js was 24.13.1. The machine had an AMD Ryzen AI 9 HX 370. `taskset -c 0-3,12-15` kept the server on 8 logical CPUs.
+
+**Data.** The seed is the seed of the template with generated posts. The posts come from `bench/corpus.js` of `relatinator`, with 300 to 3,000 words, the seed 2026, and Portable Text content. Each size has a seeded D1 state: 7 posts (the template only), 200 posts, and 1,005 posts.
+
+**Method.** For each run, size, and variant, the script copies the seeded state, starts the server, and sends one first request and 10 later requests. Each request is for a different post. Then it stops the server. The variant order rotates in each run, so each variant sees the same machine load. Each value is the median of 6 runs, with the range in parentheses. The later value of a run is the median of its 10 later requests. All times are in ms.
+
+The page measures the call with `Date.now()`. In workerd, `Date.now()` changes only at I/O. The page waits for a 0 ms timer before each clock read, so the time includes the CPU work. EmDash gives the count and the time of the database queries in the `Server-Timing` header.
+
+**First run, `maxAge` 0.** This run used `astro-relatinator` 3.1.0 and `relatinator` 3.2.0 from npm, in the post page of the template. The load average was 8 to 17 on 24 logical CPUs.
+
+| Posts | First call           | Later call       | Page with the call, later request | Page without the call, later request |
+| ----- | -------------------- | ---------------- | --------------------------------- | ------------------------------------ |
+| 7     | 13 (11 to 16)        | 5 (4 to 5)       | 32 (26 to 41)                     | 29 (23 to 32)                        |
+| 200   | 274 (228 to 701)     | 54 (47 to 135)   | 87 (74 to 233)                    | 35 (28 to 36)                        |
+| 1,005 | 1,042 (919 to 1,485) | 274 (222 to 353) | 310 (253 to 399)                  | 37 (29 to 57)                        |
+
+At 1,005 posts, a later request with the call made 14 database queries, and a later request without the call made 3. Thus the call made 11 queries, one for each page of 100 entries. A first request with the call made 24 queries. The CPU time of the workerd process for a first request was 1,460 ms with the call and 200 ms without the call.
+
+A split endpoint repeats the steps of a first call on each request, with a timer before each clock read. These are its times for 1,005 posts:
+
+| Step                                    | First request      | Later request      |
+| --------------------------------------- | ------------------ | ------------------ |
+| Read of the collection, 11 pages        | 311 (270 to 521)   | 251 (216 to 426)   |
+| Text of each entry, for the fingerprint | 25 (18 to 31)      | 18 (15 to 29)      |
+| Text of each entry, for the model       | 27 (21 to 38)      | 20 (17 to 27)      |
+| Model build                             | 831 (716 to 1,422) | 706 (572 to 1,192) |
+| `findRelated()`                         | 3 (2 to 4)         | 2 (1 to 3)         |
+
+For 200 posts, the model build of a first request took 182 ms (172 to 250). In the same runs, `bench/bench.mjs` with the same `dist` and 1,005 posts in memory gave 467 ms (413 to 726) for a first call and 20 ms (17 to 23) for a later call.
+
+**Second run, `maxAge` 0 and 60.** This run used the packed tarballs of this branch and the page `bench/workerd/templates/post-page.astro`. This page shows only the title and the related list, so its page times are shorter than the times of the first run. The load average was 5 to 6. The size was 1,005 posts.
+
+| Variant          | First call       | Later call       | Page, later request | Queries, later request | workerd CPU, later request |
+| ---------------- | ---------------- | ---------------- | ------------------- | ---------------------- | -------------------------- |
+| `maxAge` 0       | 854 (823 to 873) | 215 (212 to 216) | 227 (223 to 228)    | 13                     | 270                        |
+| `maxAge` 60      | 854 (832 to 878) | 2 (1 to 2)       | 12 (12 to 13)       | 2                      | 10                         |
+| Without the call | Not applicable   | Not applicable   | 12 (11 to 13)       | 2                      | 10                         |
+
+With `maxAge` 60, the first call is the full read, so its time is the same as with `maxAge` 0. Inside the window, the page made only the 2 queries of `getEmDashEntry()`.
+
+**Errors and outputs.** No request failed in the two runs. The script counts a request as an error when the status is not 200, or when the related list does not have 3 items (0 items without the call). The second run sent 198 requests and had 0 errors. No check sent an invalid `maxAge` to workerd. The unit tests check the `RangeError`.
+
+**What limits each value.**
+
+- First call: the model build, 831 of 1,042 ms at 1,005 posts. [Performance without output changes](#performance-without-output-changes) tells that `tokenize()` takes most of the build time.
+- Later call with `maxAge` 0: the read of the collection, 251 of 274 ms at 1,005 posts. The text for the fingerprint took 18 ms. EmDash gave 163 ms of query time for the call (172 ms with the call, about 9 ms without it). The rest of the read time is outside the queries that EmDash times.
+- Later call inside the window: `findRelated()` and the clock. The clock has a resolution of 1 ms, and the timer before a clock read adds about 1 ms. Without the call, the page measured 1 ms between the same two clock reads.
+- Page without the call: `getEmDashEntry()` and the render.
+
+**Caveats.**
+
+- Local D1 is a local SQLite database. On Cloudflare, each of the 11 queries goes over the network. No check measured a call on Cloudflare.
+- The CPU column is the user and system time of the workerd process from `/proc/<pid>/stat`, in steps of 10 ms. It is not the CPU time that Cloudflare counts.
+- The posts are synthetic. Real posts can have more or less text.
+- The two runs used different pages and different machine load. Compare values only inside one run.
+
+To repeat the workerd measurement, run the commands in an empty work directory. `<repo>` is the path of this repository, and `<bench>` is `<repo>/packages/astro-relatinator/bench/workerd`.
+
+1. Run `npm create emdash@1.3.1 site -- --template cloudflare:blog`. Then run `npm install` in the new `site` directory.
+2. In `<repo>/packages/relatinator` and in `<repo>/packages/astro-relatinator`, run `pnpm pack`. Install the two tarballs in the site with one `npm install` command.
+3. Copy `<bench>/templates/post-page.astro` to `site/src/pages/posts/[slug].astro`. Copy `<bench>/templates/split.ts` to `site/src/pages/bench/split.ts`. Do this before step 5, because `seed-size.sh` builds the site.
+4. Run `mkdir seeds states`. Then make a seed for each size, for example `node <bench>/gen-seed.mjs site/seed/seed.json 1005 seeds/seed-1005.json`. The size is the number of published posts. The template has 7 published posts.
+5. Seed a D1 state for each size, for example `<bench>/seed-size.sh site seeds/seed-1005.json states/state-1005`. The script builds the site, starts it, runs the EmDash setup, and copies the D1 state. At its end, also after an error, the script stops the server and puts back the seed of the site.
+6. Run `node <bench>/measure.mjs --site site --states states --runs 6 --sizes 1005 --variants related,window,baseline --cpus 0-3,12-15`. The script writes `results.json`. `--max-age` sets the window of the `window` variant (default `60`). The `split` variant calls the split endpoint. The `node` variant runs `bench/bench.mjs` with the `dist` of the site. `--port` sets the port (default `4399`).
+7. Run `node <bench>/summarize.mjs results.json`. It prints each value as the median, with the range in brackets. In `results.json` and in the summary, the `cold` keys are for the first request, and the `warm` keys are for the later requests.
+
+The scripts need Linux, because they read `/proc` and use `taskset` and `pgrep`. `measure.mjs` stops the preview server of the site before each start. Each server start copies the state, so the measurement does not change the seeded states.
+
 ## Known gaps and follow-ups
 
-These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17.
+These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17. The topic plugin items, the live collection item, the workerd items, and the preview item were open on 2026-10-19.
 
 - **Astro 6 in the repository.** All workspace packages use Astro 7.3.8. Only the manual consumer build used Astro 6.4.8.
-- **Lowest supported versions.** No check covers the lowest versions of the supported ranges. All checks ran on Node.js 24.13.1, not on Node.js 22.12. The Astro checks used 6.4.8 and 7.3.8, not 6.0 and 7.0. The EmDash check used 1.2.0, not 1.0. For emdash 1.0.0, only the result type of `getEmDashCollection()` was read.
-- **On-demand pages with `getRelated()`.** No check renders `getRelated()` in an on-demand page. The EmDash check covers on-demand rendering only through `getEmDashRelated()`.
+- **Lowest supported versions.** No check covers the lowest versions of the supported ranges. All checks ran on Node.js 24.13.1, not on Node.js 22.12. The Astro checks used 6.4.8 and 7.3.8, not 6.0 and 7.0. The EmDash check used 1.2.0, and the preview checks used 1.3.1, not 1.0. For emdash 1.0.0, a code reading on 2026-10-19 covered the result type of `getEmDashCollection()`, the request context, the collection read, and the `data.id` of a preview. No check ran a site with emdash 1.0.0.
+- **On-demand pages with `getRelated()`.** No check renders `getRelated()` in an on-demand page. The EmDash check covers on-demand rendering only through `getEmDashRelated()`, and the live collection check only through `getLiveRelated()`.
+- **Live collections.** The live collection check used Astro 7.3.8 and the Node.js adapter only. No check used Astro 6, the Cloudflare adapter, `astro dev`, or a real API loader. `getLiveRelated()` does not give a loader filter to `getLiveCollection()`, so each call loads the whole collection. A loader that needs a filter fails. On darko.io with emdash 1.2.0, the `emdashLoader()` collection failed with "type filter is required". The README tells EmDash sites to use `getEmDashRelated()`. It does not use `cacheHint`. The result type depends on `LiveLoaderDataType`, which Astro does not document. If a later Astro version renames this type, the result type can become `any`, or `tsc` can report an error.
 - **Browsers.** No test runs `relatinator` in a browser. The portability check shows only that the bundle has no imports.
 - **CI.** The repository has no CI workflow. The automated checks run only when a maintainer runs them.
 - **Changesets.** The root `package.json` has `@changesets/cli` and `@changesets/changelog-github` in `devDependencies`. The repository has no `.changeset` directory, so Changesets is not set up. Maintainers edit the changelogs by hand.
@@ -300,15 +595,25 @@ These items were open on 2026-10-16. The three `classify()` items were open on 2
 - **Prettier configuration.** `.prettierrc` in both libraries sets `jsxBracketSameLine`, which Prettier 3 deprecates. Each Prettier run prints a warning.
 - **Prettier coverage.** Only the two libraries have `format:check` scripts. The root README, `docs/`, and the playground have no Prettier check.
 - **Double build in `pnpm check`.** The `precheck` script of `astro-relatinator` builds `relatinator`. Then the `precheck` script of the playground builds `relatinator` and `astro-relatinator` again.
-- **`relatedIndex()` trusts its callers.** When `text` is set, `versionOf` must return the text that `text` returns. Both callers do this, but `relatedIndex()` does not enforce it.
+- **`relatedIndex()` trusts its callers.** When `text` is set, `versionOf` must return the text that `text` returns. All three callers do this, but `relatedIndex()` does not enforce it.
 - **Two meanings of `entries`.** In `src/related-index.ts`, `Corpus.entries` is an array of entries. `RelatedIndex.entries(ids)` is a function that maps ids to entries.
-- **`limit` in the shared options.** `RelatedOptions` contains `limit`, but `relatedIndex()` does not read it. `getRelated()` and `getEmDashRelated()` give `limit` to the model.
-- **Preview of a published entry.** A preview of a published entry has the id of the published entry. `getEmDashRelated()` ranks it by the published text, not by the preview text. Thus the related list does not show the effect of unpublished edits.
-- **Draft with a new slug.** If a draft revision changes the slug of a published entry, the draft id is not in the model. `getEmDashRelated()` then queries with the draft text and excludes only the new id. The published version of the same entry can then be in the results. This item comes from a code reading of `src/emdash.ts` and the emdash 1.2.0 `loader.ts`. No test or manual check covers it.
-- **Warm EmDash calls.** Each `getEmDashRelated()` call makes the text of every entry, because the cache uses the text as the version. The freshness rule needs this text, so a call with a cached model cannot skip it. This text takes most of the time of such a call. The [3.1.0 changelog](../packages/astro-relatinator/CHANGELOG.md#310---2026-10-16) gives the times.
-- **Benchmark data.** Both benchmarks use the synthetic posts of `bench/corpus.js`. The helper benchmark reads in-memory collections, not a database, and it does not run Astro. Thus its times do not include a database read or a page render.
+- **`limit` and `filter` in the shared options.** `RelatedOptions` contains `limit` and `filter`, but `relatedIndex()` does not read them. `getRelated()` and `getEmDashRelated()` give them to the model.
+- **Entry objects without `data.id`.** The exclusion of the published version of a draft with a new slug needs `data.id`. A page that gives an object without `data.id` can get the published version in the list.
+- **Warm EmDash calls.** Without `maxAge`, each `getEmDashRelated()` call reads every entry and makes the text of every entry, because the cache uses the text as the version. In the [workerd measurement](#workerd-measurement-of-getemdashrelated) with 1,005 posts, the read took most of the time of a later call: 251 of 274 ms. The text took 18 ms. `maxAge` skips both inside a window, but the lists can then be stale. No check measured a call on Cloudflare D1 over the network.
+- **Cold EmDash calls.** The first call in each isolate builds the model. In local workerd, the build took 182 ms for 200 posts and 831 ms for 1,005 posts. This is more than the 10 ms of CPU time for each request of the Workers Free plan. A saved model could remove the build. The package does not have one. [A freshness window, not a saved model](#a-freshness-window-not-a-saved-model) gives the reasons.
+- **`text` functions in a window.** Two `text` functions with the same source code share one window. The window does not compare their texts.
+- **Benchmark data.** The automated benchmarks use the synthetic posts of `bench/corpus.js`. The helper benchmark reads in-memory collections, not a database, and it does not run Astro. The workerd measurement reads a local D1 database in local workerd, with the same synthetic posts. No measurement used real posts or Cloudflare's network.
 - **3.0 manual checks on the 3.1 code.** The consumer builds, the Cloudflare check, and the EmDash check ran on the 3.0 code. They did not run on the 3.1 code.
 - **`classify()` defaults.** The defaults `ratio` 0.5 and `limit` 3 come from the eval of 37 posts. The same posts chose them and measured them. No second corpus checks them. The test on 2026-10-18 added one post and two more taggers, but no new corpus. Its taggers were language models, not people. The eval scripts are not in the repository.
 - **Posts that match no topic.** Issue #6 asks for a list of the posts that match no topic. A relative cut gives each text with a matching term at least one topic. Thus `classify()` cannot give this list. It needs a different signal.
-- **Topics in `astro-relatinator`.** `astro-relatinator` has no topic option, and EmDash terms are not topics yet. Issue #6 describes both.
+- **Topics in `astro-relatinator`.** Issue #6 asks for topics for Astro content collections. `astro-relatinator` exports `entryText()`, and the README has a recipe that gives this text to `classify()`. The package has no topic option and no topic cache, because one `classify()` call reads only the topic list. Only the manual playground check runs the recipe in an Astro page. The playground post page calls `classify()` with `entryText()`, and `astro check` type-checks it. Since the topic plugin, EmDash terms are topics in the entry editor. [EmDash terms as topics, in an editor panel](#emdash-terms-as-topics-in-an-editor-panel) describes it.
+- **The topic plugin in the sandbox.** Only the [sandbox check](#manual-check-of-the-topic-plugin-in-the-sandbox) runs the plugin in `sandboxed: []`, in local workerd. No check ran it on Cloudflare. No check measured the plugin against the default limits of 50 ms of CPU time and 10 subrequests for each invocation. A code reading did not find if local workerd enforces them, or if each call to the bridge counts as a subrequest. A `panel_load` makes 3 bridge calls and 1 more for each taxonomy of the collection. An add makes 1 more call for each taxonomy with selected terms. No automated test runs the bundle in workerd. `@emdash-cms/plugin-test` 0.2.10 needs Vitest 4, `@cloudflare/vitest-plugin`, and a build with `@emdash-cms/plugin-cli`. The package uses Vitest 5. No check used the sandbox runner of another platform. The default limits are in `src/plugins/sandbox/types.ts` of emdash 1.3.1 (`cpuMs` and `subrequests`).
+- **The text of the topic panel.** The panel reads the data that `ctx.content.get()` returns. In emdash 1.3.1, this data comes from the stored columns of the entry (`ContentRepository.findById()`), not from a revision. A code reading did not find if an unpublished draft revision of a published entry changes these columns. No check covers an entry with a draft revision.
+- **Unsaved changes in the topic panel.** The panel reads the saved content of the entry, not the changes that are not saved in the editor.
+- **The matched words.** The panel shows at most 3 words. Each word is the first word of the entry with that stem, so the panel can show a different form than the form that occurs most, for example "conferences" for the term "conference". A word that gives more than one token splits at its apostrophes, for example "rock'n'roll". If that word also has an elision, a part can give another stem than `tokenize()`. The panel then shows the stem in place of a word. For the test word "o'won't", the panel shows "wo". No check found such a word in real text. A long label can wrap in the narrow sidebar. Block Kit 1.3.1 has no description for a checkbox option, so the words are in the label. A screen reader reads them as a part of the label.
+- **Taxonomies only.** The plugin does not read `multiSelect` fields. A site with tags in such a field must move them to a taxonomy. The plugin has no migration for this move.
+- **emdash 1.2.0.** The README asks for emdash 1.3.1 or later. With emdash 1.2.0, the panel loaded and `panel_load` worked, but no check added a term or checked the reload after an add.
+- **The reload after an add.** After the panel adds terms, the admin loads the entry page again. This reload loses the changes that are not saved. The emdash 1.3.1 admin has no `beforeunload` guard, so the browser does not warn the user.
+- **Entries with a null locale.** For an entry with a `null` locale, the panel reads the taxonomies and the terms of all locales. Thus the panel can show a taxonomy group more than one time. This case is rare. The `locale` columns of the taxonomy tables are NOT NULL since migration 036 of emdash 1.3.1, and the `locale` columns of the content tables are NOT NULL since migration 019.
+- **The plugin version.** The descriptor sets `version` by hand. A test in `test/emdash-plugin.test.ts` fails when it is not the version in `package.json`.
 - **Native EmDash plugins.** How a page can read the data of a native EmDash plugin is an open question upstream. Until EmDash answers it, the site helper is the supported design.

@@ -24,7 +24,7 @@ export async function getRelated<C extends CollectionKey>(
       key: String(collection),
       entries,
       textOf,
-      versionOf: (e) => (!text && e.digest ? e.digest : textOf(e)),
+      versionOf: (e) => (!text && e.digest ? String(e.digest) : textOf(e)),
     },
     options
   );
@@ -34,5 +34,5 @@ export async function getRelated<C extends CollectionKey>(
       `astro-relatinator: no entry "${id}" in collection "${String(collection)}"`
     );
   }
-  return index.entries(index.model.findRelated(id, { limit: options.limit }));
+  return index.entries(index.model.findRelated(id, index.query(options)));
 }

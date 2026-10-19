@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "astro": "7.3.8",
-    "astro-relatinator": "workspace:^"
+    "astro-relatinator": "workspace:^",
+    "relatinator": "workspace:^"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",

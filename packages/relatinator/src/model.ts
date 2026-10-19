@@ -1,8 +1,10 @@
 import { tokenize } from "./tokenize.js";
 import type {
   ModelOptions,
+  QueryOptions,
   RelatinatorDocument,
   RelatinatorModel,
+  ScoredDocument,
   ScoredTerm,
   SimilarityMethod,
 } from "./index.js";
@@ -175,12 +177,12 @@ function topIndices(
   documents: readonly IndexedDocument[],
   scores: Float64Array,
   limit: number,
-  excluded: ReadonlySet<string>
+  keep: (id: string) => boolean
 ): number[] {
   const top: number[] = [];
   for (const [index, score] of scores.entries()) {
     const enters = top.length < limit || score > scores[top[limit - 1]];
-    if (!(score > 0 && enters) || excluded.has(documents[index].id)) continue;
+    if (!(score > 0 && enters) || !keep(documents[index].id)) continue;
     let slot = top.length;
     while (slot > 0 && scores[top[slot - 1]] < score) slot--;
     top.splice(slot, 0, index);
@@ -189,27 +191,61 @@ function topIndices(
   return top;
 }
 
+/** The scores of one query, and the indices of its results in rank order. */
+interface Ranking {
+  readonly scores: Float64Array;
+  readonly indices: readonly number[];
+}
+
+/** The indices of the ranked documents, best first. */
 function rank(
   documents: readonly IndexedDocument[],
   scores: Float64Array,
   limit: number,
-  excluded: ReadonlySet<string> = new Set()
-): string[] {
+  keep: (id: string) => boolean = () => true
+): number[] {
   if (Number.isInteger(limit) && limit >= 0 && limit <= MAX_TOP_LIMIT) {
-    const top = topIndices(documents, scores, limit, excluded);
-    return top.map((index) => documents[index].id);
+    return topIndices(documents, scores, limit, keep);
   }
-  // Sorting entries in input order with a stable sort keeps 3.0.0's tie order.
+  // Sorting indices in input order with a stable sort keeps 3.0.0's tie order.
   return documents
-    .map((doc) => ({ id: doc.id, score: scores[doc.index] }))
-    .filter((entry) => entry.score > 0 && !excluded.has(entry.id))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map((entry) => entry.id);
+    .map((doc) => doc.index)
+    .filter((index) => scores[index] > 0 && keep(documents[index].id))
+    .sort((a, b) => scores[b] - scores[a])
+    .slice(0, limit);
+}
+
+/** Keeps the ids that are not excluded and that `filter` accepts. */
+function keeper(
+  excluded: Iterable<string>,
+  filter?: QueryOptions["filter"]
+): (id: string) => boolean {
+  const skip = new Set(excluded);
+  return filter ? (id) => !skip.has(id) && filter(id) : (id) => !skip.has(id);
 }
 
 function byScoreThenTerm(a: ScoredTerm, b: ScoredTerm): number {
   return b.score - a.score || (a.term < b.term ? -1 : a.term > b.term ? 1 : 0);
+}
+
+/**
+ * The terms of `query` that `other` also contains, each with the amount that
+ * it adds to the score of `other`: its tf in `query` times its weight in
+ * `other`. These are the summands of the score, in query order.
+ */
+function contributions(
+  corpus: Corpus,
+  weightFor: TermWeight,
+  query: IndexedDocument,
+  other: IndexedDocument
+): ScoredTerm[] {
+  const otherTfs = new Map(other.terms.map((term, i) => [term, other.tfs[i]]));
+  return query.terms.flatMap((term, i) => {
+    const tf = otherTfs.get(term);
+    if (tf === undefined) return [];
+    const weight = weightFor(corpus.dfs[term])(tf, other);
+    return [{ term: corpus.terms[term], score: query.tfs[i] * weight }];
+  });
 }
 
 /** Per-document score totals of queries against one indexed corpus. */
@@ -280,14 +316,40 @@ export function createModel(
     return doc;
   };
 
+  const relatedTo = (
+    id: string,
+    { limit = DEFAULT_LIMIT, exclude = [], filter }: QueryOptions = {}
+  ): Ranking => {
+    const scores = score(lookup(id));
+    const keep = keeper([id, ...exclude], filter);
+    return { scores, indices: rank(corpus.documents, scores, limit, keep) };
+  };
+
+  const relatedToText = (
+    text: string,
+    { limit = DEFAULT_LIMIT, exclude = [], filter }: QueryOptions = {}
+  ): Ranking => {
+    const scores = scoreText(text);
+    const keep = keeper(exclude, filter);
+    return { scores, indices: rank(corpus.documents, scores, limit, keep) };
+  };
+
+  const idsOf = (indices: readonly number[]): string[] =>
+    indices.map((index) => corpus.documents[index].id);
+
+  const scoredOf = ({ scores, indices }: Ranking): ScoredDocument[] =>
+    indices.map((index) => ({
+      id: corpus.documents[index].id,
+      score: scores[index],
+    }));
+
   return {
     method,
     size: corpus.documents.length,
     has: (id) => corpus.byId.has(id),
-    findRelated: (id, { limit = DEFAULT_LIMIT } = {}) =>
-      rank(corpus.documents, score(lookup(id)), limit, new Set([id])),
-    findRelatedToText: (text, { limit = DEFAULT_LIMIT, exclude = [] } = {}) =>
-      rank(corpus.documents, scoreText(text), limit, new Set(exclude)),
+    findRelated: (id, options) => idsOf(relatedTo(id, options).indices),
+    findRelatedToText: (text, options) =>
+      idsOf(relatedToText(text, options).indices),
     getTopTerms: (id, limit = DEFAULT_LIMIT) => {
       const doc = lookup(id);
       return doc.terms
@@ -302,7 +364,14 @@ export function createModel(
       const [token] = tokenize(term);
       return token === undefined
         ? []
-        : rank(corpus.documents, score(queryOf([token])), limit);
+        : idsOf(rank(corpus.documents, score(queryOf([token])), limit));
     },
+    findRelatedScored: (id, options) => scoredOf(relatedTo(id, options)),
+    findRelatedToTextScored: (text, options) =>
+      scoredOf(relatedToText(text, options)),
+    explainRelated: (id, otherId, limit = DEFAULT_LIMIT) =>
+      contributions(corpus, weightFor, lookup(id), lookup(otherId))
+        .sort(byScoreThenTerm)
+        .slice(0, limit),
   };
 }

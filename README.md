@@ -64,7 +64,8 @@ To test a change in a real Astro site, use the playground. Its README has the [e
     │   └── scripts/           The portability check
     ├── astro-relatinator/     The Astro and EmDash helpers (npm package astro-relatinator)
     │   ├── src/               getRelated(), getEmDashRelated(), model cache, integration
-    │   └── test/              Vitest tests and stubs for astro:content and emdash
+    │   ├── test/              Vitest tests and stubs for astro:content and emdash
+    │   └── scripts/           The bundle step and the check of the sandbox entry
     └── playground/            A private Astro 7 site with six posts
 ```
 

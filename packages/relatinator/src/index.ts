@@ -15,19 +15,33 @@ export interface ScoredTerm {
   score: number;
 }
 
+export interface ScoredDocument {
+  id: string;
+  score: number;
+}
+
 export interface QueryOptions {
   limit?: number;
+  /** Ids to leave out of the results. */
   exclude?: readonly string[];
+  /** Keeps a document in the results only when it returns true. */
+  filter?: (id: string) => boolean;
 }
 
 export interface RelatinatorModel {
   readonly method: SimilarityMethod;
   readonly size: number;
   has(id: string): boolean;
-  findRelated(id: string, options?: { limit?: number }): string[];
+  findRelated(id: string, options?: QueryOptions): string[];
   findRelatedToText(text: string, options?: QueryOptions): string[];
   getTopTerms(id: string, limit?: number): ScoredTerm[];
   getTopDocumentsForTerm(term: string, limit?: number): string[];
+  findRelatedScored(id: string, options?: QueryOptions): ScoredDocument[];
+  findRelatedToTextScored(
+    text: string,
+    options?: QueryOptions
+  ): ScoredDocument[];
+  explainRelated(id: string, otherId: string, limit?: number): ScoredTerm[];
 }
 
 export interface Topic {

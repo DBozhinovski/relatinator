@@ -16,6 +16,10 @@ export async function getEmDashCollection(type, { limit, cursor } = {}) {
   };
 }
 
+export function getRequestContext() {
+  return undefined;
+}
+
 export async function getCollection(collection) {
   return collections.get(collection) ?? [];
 }

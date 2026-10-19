@@ -106,6 +106,22 @@ describe("getEmDashRelated types", () => {
     expect(related.map((entry) => entry.id)).toEqual(["black-holes"]);
   });
 
+  it("gives `filter` published entries of D", async () => {
+    const related = await getEmDashRelated<CmsPostData>(
+      "typed-posts",
+      { id: "draft", data: { title: "Black holes" } },
+      {
+        fields: ["title"],
+        filter: (entry) => {
+          expectTypeOf(entry).toEqualTypeOf<EmDashEntry<CmsPostData>>();
+          return entry.data.pub_date !== "2026-10-02";
+        },
+      }
+    );
+
+    expect(related.map((entry) => entry.id)).toEqual(["black-holes"]);
+  });
+
   it("rejects entry data that conflicts with D", () => {
     const call = () =>
       getEmDashRelated<CmsPostData>("typed-posts", {

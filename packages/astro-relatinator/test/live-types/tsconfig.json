@@ -1,0 +1,6 @@
+{
+  // `test/tsconfig.json` excludes this project, so this file clears `exclude`.
+  "extends": "../tsconfig.json",
+  "include": ["."],
+  "exclude": []
+}
