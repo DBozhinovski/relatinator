@@ -2,6 +2,14 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
+## Unreleased
+
+- **New:** `findRelated()` and `findRelatedToText()` accept `filter: (id) => boolean`. A document stays in the results only when `filter` returns `true`.
+- **New:** `findRelated()` accepts `exclude`, as `findRelatedToText()` does. Version 3.2.0 did not read `exclude` in `findRelated()`, and TypeScript rejected it.
+- `exclude` and `filter` apply before `limit`, so a filtered list still has `limit` ids when enough documents match. They do not change the weights.
+- Without `exclude` and `filter`, the results, the tie order, and the scores are the same as in 3.2.0. The equivalence test with 3.0.0 passes without changes.
+- The minified bundle of `dist/index.js` is 9594 bytes. In version 3.2.0, it was 9499 bytes.
+
 ## [3.2.0] - 2026-10-18
 
 This release adds `classify()`. The other functions do not change.

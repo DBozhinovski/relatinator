@@ -52,6 +52,16 @@ describe("getRelated", () => {
     );
   });
 
+  it("applies `filter` to the entries before the limit", async () => {
+    const related = await getRelated("posts", "black-holes", {
+      limit: 1,
+      filter: (entry) => entry.data.title !== "The event horizon",
+    });
+
+    expect(ids(related)).toEqual(["galaxies"]);
+    expect(related[0]).toBe(posts[2]);
+  });
+
   it("throws for an id that is not in the collection", async () => {
     await expect(getRelated("posts", "missing")).rejects.toThrow(
       'astro-relatinator: no entry "missing" in collection "posts"'

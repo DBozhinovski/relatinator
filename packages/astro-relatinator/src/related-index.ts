@@ -1,14 +1,24 @@
 import {
   createModel,
+  type QueryOptions,
   type RelatinatorModel,
   type SimilarityMethod,
 } from "relatinator";
 import type { ContentEntry } from "./entry-text.js";
 import { getCachedModel } from "./model-cache.js";
 
-export interface RelatedOptions<E> {
+/**
+ * `E` is the entry that `text` gets. `R` is the entry that `filter` gets,
+ * which is an entry of the corpus.
+ */
+export interface RelatedOptions<E, R = E> {
   /** Maximum number of related entries. Default: 5. */
   limit?: number;
+  /**
+   * Keeps an entry in the results only when it returns true. The filter
+   * applies before `limit`. It does not change the model.
+   */
+  filter?: (entry: R) => boolean;
   /** Scoring method. Default: "bm25". */
   method?: SimilarityMethod;
   /**
@@ -34,6 +44,8 @@ export interface RelatedIndex<E> {
   readonly model: RelatinatorModel;
   /** The entries of the corpus with the given ids, in the same order. */
   entries(ids: readonly string[]): E[];
+  /** Query options for the model. Its id filter gives `filter` the entry of each id. */
+  query(options: Pick<RelatedOptions<E>, "limit" | "filter">): QueryOptions;
 }
 
 /**
@@ -44,7 +56,11 @@ export interface RelatedIndex<E> {
  */
 export function relatedIndex<E extends ContentEntry>(
   { key, entries, textOf, versionOf }: Corpus<E>,
-  { method = "bm25", fields, text }: RelatedOptions<E>
+  {
+    method = "bm25",
+    fields,
+    text,
+  }: Pick<RelatedOptions<E>, "method" | "fields" | "text">
 ): RelatedIndex<E> {
   const source = text ? `text:${text}` : `fields:${JSON.stringify(fields)}`;
   const model = getCachedModel(
@@ -57,17 +73,21 @@ export function relatedIndex<E extends ContentEntry>(
       )
   );
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
+  const entryOf = (id: string): E => {
+    const entry = byId.get(id);
+    if (!entry) {
+      throw new Error(
+        `astro-relatinator: internal error: ranked id "${id}" is not in the corpus`
+      );
+    }
+    return entry;
+  };
   return {
     model,
-    entries: (ids) =>
-      ids.map((id) => {
-        const entry = byId.get(id);
-        if (!entry) {
-          throw new Error(
-            `astro-relatinator: internal error: ranked id "${id}" is not in the corpus`
-          );
-        }
-        return entry;
-      }),
+    entries: (ids) => ids.map(entryOf),
+    query: ({ limit, filter }) => ({
+      limit,
+      filter: filter && ((id) => filter(entryOf(id))),
+    }),
   };
 }

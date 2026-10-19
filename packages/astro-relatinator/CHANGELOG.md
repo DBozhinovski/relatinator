@@ -6,8 +6,12 @@ All notable changes to the "astro-relatinator" project will be documented in thi
 
 - **New:** The new `astro-relatinator/emdash-plugin` entry point is an EmDash plugin. It adds a "Suggested topics" panel to the entry editor. The panel suggests terms from the taxonomies of the collection with `classify()`. The user selects the terms, and the panel adds them to the entry. [EmDash topic suggestions](README.md#emdash-topic-suggestions) tells how to install it.
 - The plugin uses the standard EmDash plugin format. It runs in `plugins: []`. It does not run in `sandboxed: []` yet.
-- The plugin needs `classify()`, so the `relatinator` dependency is now `^3.2.0`.
+- The published `relatinator` dependency is the `relatinator` version of this release. The plugin needs `classify()`, and `filter` needs the `filter` query option of `relatinator`.
 - The new `astro-relatinator/emdash-plugin/sandbox` entry point is the plugin code that EmDash loads. Do not import it in your pages.
+- **New:** `getRelated()` and `getEmDashRelated()` accept `filter: (entry) => boolean`. An entry stays in the results only when `filter` returns `true`. The filter applies before `limit`, so a filtered list still has `limit` entries when enough entries match. The model contains all entries of the collection, so the scores do not change. `filter` is not a part of the cache key.
+- **New:** `getEmDashRelated()` accepts `locale`. It gives `locale` to `getEmDashCollection()`. Without `locale`, the call to `getEmDashCollection()` does not change.
+- **Perf:** The cache key of `getEmDashRelated()` contains the locale. With `locale`, it is that locale. Without `locale`, it is the locale of the EmDash request context, which EmDash uses for a preview or in edit mode. Before this change, all locales of a collection used one model. A call for a different locale than the last call built a new model.
+- The type declarations for `emdash` contain the `locale` query option of `getEmDashCollection()` and `getRequestContext()`.
 
 ## [3.1.0] - 2026-10-16
 

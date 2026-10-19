@@ -77,12 +77,13 @@ The result has the same type as `getCollection("posts")`, so TypeScript knows th
 
 ## Options
 
-| Option   | Type                  | Default    | Description                                                                 |
-| -------- | --------------------- | ---------- | --------------------------------------------------------------------------- |
-| `limit`  | `number`              | `5`        | The maximum number of related entries.                                      |
-| `method` | `"bm25"` or `"tfidf"` | `"bm25"`   | The scoring method.                                                         |
-| `fields` | `readonly string[]`   | all fields | The `data` keys to read. The body is always read.                           |
-| `text`   | `(entry) => string`   | none       | A function that returns the full text of an entry. It replaces the default. |
+| Option   | Type                  | Default    | Description                                                                                     |
+| -------- | --------------------- | ---------- | ----------------------------------------------------------------------------------------------- |
+| `limit`  | `number`              | `5`        | The maximum number of related entries.                                                          |
+| `method` | `"bm25"` or `"tfidf"` | `"bm25"`   | The scoring method.                                                                             |
+| `fields` | `readonly string[]`   | all fields | The `data` keys to read. The body is always read.                                               |
+| `text`   | `(entry) => string`   | none       | A function that returns the full text of an entry. It replaces the default.                     |
+| `filter` | `(entry) => boolean`  | none       | Keeps an entry in the results only when the function returns `true`. It applies before `limit`. |
 
 The default text of an entry has two parts:
 
@@ -99,7 +100,15 @@ await getRelated("posts", post, { fields: ["title", "tags"] });
 await getRelated("posts", post, {
   text: (entry) => `${entry.data.title} ${entry.data.tags.join(" ")}`,
 });
+
+// Show 3 related posts in the language of this post.
+await getRelated("posts", post, {
+  limit: 3,
+  filter: (entry) => entry.data.lang === post.data.lang,
+});
 ```
+
+`filter` changes only the results. The model contains all entries of the collection, so the scores do not change. Because `filter` applies before `limit`, the result has `limit` entries when enough entries match.
 
 ## How it works
 
@@ -107,7 +116,7 @@ await getRelated("posts", post, {
 
 ### The model cache
 
-`getRelated()` builds one model for each combination of collection, `method`, and `fields` (or `text`). Later calls use the same model while the collection does not change. Thus a build with many pages builds each model one time.
+`getRelated()` builds one model for each combination of collection, `method`, and `fields` (or `text`). `limit` and `filter` do not change the model. Later calls use the same model while the collection does not change. Thus a build with many pages builds each model one time.
 
 To find changes, `getRelated()` compares the id and the `digest` of each entry. Entries from the built-in loaders have a digest. If an entry has no digest, it compares the text of the entry.
 
@@ -125,6 +134,7 @@ In `astro dev`, the related entries update when you edit a content file. You do 
 - Each call reads the whole collection. With `text`, and on EmDash, each call also makes the text of every entry to find changes. The time for a call and for a model build grows with the size of the collection.
 - The cache keeps a model for each set of options that your pages use. It does not remove models.
 - The related entries come from the collection that you give. `getRelated()` does not compare entries across collections.
+- `filter` does not remove entries from the model. All entries of the collection change the weights of the terms.
 - `getEmDashRelated()` ranks only published entries. [Which entries are compared](#which-entries-are-compared) tells how it uses a draft or a preview.
 - The tokenizer is for English text. [How scoring works](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#how-scoring-works) gives the steps.
 
@@ -202,9 +212,32 @@ const cards = related.map(({ id, data }) => ({
 
 ### EmDash options
 
-The options are the same as for `getRelated()`: `limit` (default `5`), `method` (default `"bm25"`), `fields`, and `text`. The `GetEmDashRelatedOptions<D>` type describes them.
+The options are the same as for `getRelated()`: `limit` (default `5`), `method` (default `"bm25"`), `fields`, `text`, and `filter`. `getEmDashRelated()` also has `locale`. The `GetEmDashRelatedOptions<D>` type describes them.
+
+| Option   | Type     | Default           | Description                                                                                  |
+| -------- | -------- | ----------------- | -------------------------------------------------------------------------------------------- |
+| `locale` | `string` | EmDash selects it | The locale of the entries to read. `getEmDashRelated()` gives it to `getEmDashCollection()`. |
 
 The `text` function gets each published entry. It also gets the entry object that you give when its id is not in the published entries. Thus the type of its argument is `EmDashEntry<Partial<D>>`, and each key of `entry.data` can be `undefined`.
+
+The `filter` function gets only published entries. Thus the type of its argument is `EmDashEntry<D>`.
+
+When you do not set `locale`, EmDash selects the locale (emdash 1.3.1):
+
+- A request with a preview token or with the edit-mode cookie uses the locale of the request.
+- Other requests use the default locale when the site has more than one locale.
+- On a site with one locale, EmDash does not filter by locale.
+
+Thus, on a site with more than one locale, a page in a different locale gets the entries of the default locale. To compare the entries of the locale of the page, set `locale`:
+
+```ts
+await getEmDashRelated("posts", post, {
+  limit: 3,
+  locale: Astro.currentLocale,
+});
+```
+
+Each locale has its own model.
 
 The default text of an entry has two parts:
 
@@ -249,7 +282,7 @@ EmDash uses the slug of an entry as its id. Thus a preview of a published entry 
 
 ### Caching on servers and Workers
 
-EmDash sites render on request. `getEmDashRelated()` reads the collection on each call. It keeps the model until an entry changes. To find changes, it compares the id and the text of each entry. [Limitations](#limitations) tells how the cache works on Node.js servers and on Cloudflare Workers.
+EmDash sites render on request. `getEmDashRelated()` reads the collection on each call. It keeps one model for each locale until an entry changes. To find changes, it compares the id and the text of each entry. [Limitations](#limitations) tells how the cache works on Node.js servers and on Cloudflare Workers.
 
 For the measured time of a call with and without a cached model, read the [3.1.0 changelog](https://github.com/DBozhinovski/relatinator/blob/master/packages/astro-relatinator/CHANGELOG.md#310---2026-10-16).
 

@@ -35,6 +35,7 @@ const model = createModel([
 model.findRelated("cats"); // ["both", "dogs"]
 model.findRelatedToText("A quiet cat", { limit: 2 }); // ["cats", "both"]
 model.findRelatedToText("pets", { exclude: ["both"] }); // ["cats", "dogs"]
+model.findRelated("cats", { limit: 1, filter: (id) => id !== "both" }); // ["dogs"]
 model.getTopTerms("dogs", 3); // [{ term: "long", score: 0.96 }, ...]
 model.getTopDocumentsForTerm("walking"); // ["dogs"]
 ```
@@ -71,17 +72,27 @@ An empty array is valid. Every query on an empty model returns `[]`.
 
 ### `RelatinatorModel`
 
-| Member                                        | Description                                                                                                  |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `method`                                      | The similarity method of the model.                                                                          |
-| `size`                                        | The number of documents.                                                                                     |
-| `has(id)`                                     | Returns `true` if the model has a document with this `id`.                                                   |
-| `findRelated(id, { limit })`                  | Uses the text of document `id` as the query. Never returns `id`. Throws if `id` is unknown.                  |
-| `findRelatedToText(text, { limit, exclude })` | Uses `text` as the query. Leaves out the ids in `exclude`.                                                   |
-| `getTopTerms(id, limit)`                      | Returns the terms with the highest weight in document `id`, as `{ term, score }`. Throws if `id` is unknown. |
-| `getTopDocumentsForTerm(term, limit)`         | Returns the documents with the highest weight for `term`.                                                    |
+| Member                                                | Description                                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `method`                                              | The similarity method of the model.                                                                          |
+| `size`                                                | The number of documents.                                                                                     |
+| `has(id)`                                             | Returns `true` if the model has a document with this `id`.                                                   |
+| `findRelated(id, { limit, exclude, filter })`         | Uses the text of document `id` as the query. Never returns `id`. Throws if `id` is unknown.                  |
+| `findRelatedToText(text, { limit, exclude, filter })` | Uses `text` as the query.                                                                                    |
+| `getTopTerms(id, limit)`                              | Returns the terms with the highest weight in document `id`, as `{ term, score }`. Throws if `id` is unknown. |
+| `getTopDocumentsForTerm(term, limit)`                 | Returns the documents with the highest weight for `term`.                                                    |
 
 The default `limit` is 5. The methods return results in rank order. [How scoring works](#how-scoring-works) gives the rules.
+
+The two `find` methods have the same options:
+
+| Option    | Type                      | Description                                                            |
+| --------- | ------------------------- | ---------------------------------------------------------------------- |
+| `limit`   | `number`                  | The maximum number of ids. Default: 5.                                 |
+| `exclude` | `readonly string[]`       | The ids to leave out of the results.                                   |
+| `filter`  | `(id: string) => boolean` | Keeps a document in the results only when the function returns `true`. |
+
+`exclude` and `filter` apply before `limit`. Thus the result has `limit` ids when enough other documents match. They do not change the weights, because the model keeps all documents. Without `exclude` and `filter`, the results are the same as in earlier 3.x versions.
 
 `getTopDocumentsForTerm` tokenizes `term` and uses the first token. If `term` has no token, for example because it is a stopword, the method returns `[]`.
 
@@ -165,7 +176,7 @@ The model scores documents in four steps.
    - TF-IDF: `idf(t) = 1 + ln(N / (1 + df(t)))`. The weight is `tf · idf(t)`.
    - BM25: `idf(t) = ln(1 + (N − df(t) + 0.5) / (df(t) + 0.5))`. The weight is `idf(t) · tf · (k1 + 1) / (tf + k1 · (1 − b + b · |d| / avgdl))`.
 3. **Score the documents.** The score of a document is the sum of the weights of the query terms in that document. A term that occurs two times in the query counts two times. `findRelated(id)` uses the terms of document `id` as the query. `findRelatedToText(text)` uses `tokenize(text)`.
-4. **Rank.** The model removes the query document and the ids in `exclude`. It also removes each document with a score of 0. A document that shares no term with the query has a score of 0. It sorts the other documents by score, highest first. Documents with equal scores keep their input order. The result is the first `limit` ids.
+4. **Rank.** The model removes the query document, the ids in `exclude`, and the ids that `filter` does not keep. It also removes each document with a score of 0. A document that shares no term with the query has a score of 0. It sorts the other documents by score, highest first. Documents with equal scores keep their input order. The result is the first `limit` ids.
 
 `getTopTerms` sorts the terms of a document by weight, highest first. Terms with equal weights are in JavaScript string order.
 

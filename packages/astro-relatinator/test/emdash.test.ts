@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { getEmDashRelated, portableTextToPlainText } from "../src/emdash.js";
 import { getRelated } from "../src/index.js";
 import { setCollection } from "./astro-content.js";
-import { failEmDashCollection, setEmDashCollection } from "./emdash.js";
+import {
+  emdashCalls,
+  failEmDashCollection,
+  setEmDashCollection,
+  setRequestContext,
+} from "./emdash.js";
 
 const ids = (entries: readonly { id: string }[]) => entries.map((e) => e.id);
 
@@ -165,6 +170,99 @@ describe("getEmDashRelated corpus", () => {
   });
 });
 
+describe("getEmDashRelated locale", () => {
+  const translated = [
+    { id: "ice", locale: "en", data: { title: "Glace comets" } },
+    { id: "fr/cometes", locale: "fr", data: { title: "Glace queue" } },
+    { id: "fr/queues", locale: "fr", data: { title: "Queue glace" } },
+  ];
+
+  it("reads only the entries of `locale`", async () => {
+    setEmDashCollection("translated", translated);
+    const calls = () => emdashCalls.filter(({ type }) => type === "translated");
+
+    expect(
+      ids(await getEmDashRelated("translated", "fr/cometes", { locale: "fr" }))
+    ).toEqual(["fr/queues"]);
+    expect(calls()).toEqual([
+      {
+        type: "translated",
+        filter: {
+          status: "published",
+          limit: 100,
+          cursor: undefined,
+          locale: "fr",
+        },
+      },
+    ]);
+    expect(ids(await getEmDashRelated("translated", "fr/cometes"))).toEqual([
+      "fr/queues",
+      "ice",
+    ]);
+    expect(calls()[1].filter.locale).toBeUndefined();
+  });
+
+  let reads = 0;
+  const text = (entry: { data: Record<string, unknown> }) => {
+    reads += 1;
+    return String(entry.data.title);
+  };
+  const withFire = [
+    ...translated,
+    { id: "fire", locale: "en", data: { title: "Fire comets" } },
+  ];
+
+  it("keeps one model for each locale", async () => {
+    setEmDashCollection("locales", withFire);
+    const related = async (id: string, locale: string) => {
+      reads = 0;
+      const result = ids(
+        await getEmDashRelated("locales", id, { locale, text })
+      );
+      return { result, reads };
+    };
+
+    await related("ice", "en");
+    await related("fr/cometes", "fr");
+
+    // A cached model reads the text of each entry once, for the
+    // fingerprint. A new model reads it again.
+    expect(await related("ice", "en")).toEqual({ result: ["fire"], reads: 2 });
+    expect(await related("fr/cometes", "fr")).toEqual({
+      result: ["fr/queues"],
+      reads: 2,
+    });
+  });
+
+  it("keeps one model for each request locale when `locale` is not set", async () => {
+    setEmDashCollection("request-locales", withFire);
+    const related = async (id: string, locale: string | undefined) => {
+      setRequestContext(locale === undefined ? undefined : { locale });
+      reads = 0;
+      try {
+        const result = ids(
+          await getEmDashRelated("request-locales", id, { text })
+        );
+        return { result, reads };
+      } finally {
+        setRequestContext(undefined);
+      }
+    };
+
+    await related("fr/cometes", undefined);
+    await related("fr/cometes", "fr");
+
+    expect(await related("fr/cometes", undefined)).toEqual({
+      result: ["fr/queues", "ice"],
+      reads: 4,
+    });
+    expect(await related("fr/cometes", "fr")).toEqual({
+      result: ["fr/queues"],
+      reads: 2,
+    });
+  });
+});
+
 describe("getEmDashRelated text", () => {
   it("reads Portable Text anywhere in the data as plain text, without its markup", async () => {
     setEmDashCollection("guides", [
@@ -315,6 +413,30 @@ describe("getEmDashRelated text", () => {
 
     expect(ids(related)).toEqual(["galaxies"]);
     expect(ids(await getEmDashRelated("posts", "sourdough"))).toEqual([]);
+  });
+
+  it("applies `filter` to the published entries before the limit", async () => {
+    const notHorizon = (entry: { data: Record<string, unknown> }) =>
+      entry.data.title !== "The event horizon";
+    const draft = {
+      id: "draft-holes",
+      data: { content: [block("Black holes and the event horizon.")] },
+    };
+
+    const related = await getEmDashRelated("posts", "black-holes", {
+      limit: 1,
+      filter: notHorizon,
+    });
+    expect(ids(related)).toEqual(["galaxies"]);
+    expect(related[0]).toBe(posts[2]);
+    expect(
+      ids(
+        await getEmDashRelated("posts", draft, {
+          limit: 1,
+          filter: notHorizon,
+        })
+      )
+    ).toEqual(["black-holes"]);
   });
 
   it("returns at most `limit` entries", async () => {

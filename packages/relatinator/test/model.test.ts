@@ -128,6 +128,47 @@ describe.each(["tfidf", "bm25"] as const)("queries with %s", (method) => {
     ).toEqual(["node", "ruby-node"]);
   });
 
+  it("applies filter before the limit, so the limit still fills", () => {
+    const notNode = (id: string) => id !== "node";
+
+    expect(
+      model.findRelated("node-examples", { limit: 2, filter: notNode })
+    ).toEqual(["ruby-node", "ruby"]);
+    expect(
+      model.findRelatedToText("node", {
+        limit: 2,
+        filter: (id) => id !== "node-examples",
+      })
+    ).toEqual(["node", "ruby-node"]);
+  });
+
+  it("drops excluded ids from findRelated before the limit", () => {
+    expect(
+      model.findRelated("node-examples", { limit: 2, exclude: ["node"] })
+    ).toEqual(["ruby-node", "ruby"]);
+  });
+
+  it("applies filter before a limit above 64, which sorts", () => {
+    const ruby = (id: string) => id.startsWith("ruby");
+
+    expect(
+      model.findRelated("node-examples", { limit: 100, filter: ruby })
+    ).toEqual(["ruby-node", "ruby"]);
+    expect(
+      model.findRelatedToText("node", { limit: 100, filter: ruby })
+    ).toEqual(["ruby-node"]);
+  });
+
+  it("gives the same results with no filter and with a filter that keeps all", () => {
+    expect(model.findRelated("node-examples", { limit: 2 })).toEqual([
+      "node",
+      "ruby-node",
+    ]);
+    expect(
+      model.findRelated("node-examples", { limit: 2, filter: () => true })
+    ).toEqual(["node", "ruby-node"]);
+  });
+
   it("leaves out documents that share no terms with the query", () => {
     expect(model.findRelatedToText("examples")).toEqual(["node-examples"]);
     expect(model.findRelatedToText("python")).toEqual([]);
