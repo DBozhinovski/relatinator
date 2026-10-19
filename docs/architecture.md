@@ -23,22 +23,24 @@ This document is for maintainers. It gives the reasons for the 3.x design, the c
 
 `astro-relatinator` reads entries, makes the text of each entry, and gives the text to `relatinator`.
 
-| File                         | Contents                                                                                                                        |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `src/get-related.ts`         | `getRelated()` for Astro content collections.                                                                                   |
-| `src/emdash.ts`              | `getEmDashRelated()` for EmDash collections. This file is the `astro-relatinator/emdash` entry point.                           |
-| `src/related-index.ts`       | `relatedIndex()`, which both helpers call. It makes the cache key and the fingerprint, gets the model, and maps ids to entries. |
-| `src/model-cache.ts`         | `getCachedModel()`. It keeps one model for each cache key.                                                                      |
-| `src/entry-text.ts`          | `entryText()`, the default text of an Astro entry, and the `ContentEntry` type. `src/index.ts` exports `entryText()`.           |
-| `src/emdash-text.ts`         | `emdashEntryText()`, the default text of an EmDash entry. `src/emdash.ts` exports it.                                           |
-| `src/portable-text.ts`       | `portableTextToPlainText()`.                                                                                                    |
-| `src/emdash-topics.ts`       | `suggestTerms()` and `topicText()`. They score the terms of EmDash taxonomies with `classify()`. They do not import `emdash`.   |
-| `src/emdash-plugin.ts`       | The plugin descriptor. This file is the `astro-relatinator/emdash-plugin` entry point.                                          |
-| `src/emdash-plugin-entry.ts` | The route of the "Suggested topics" editor panel. This file is the `astro-relatinator/emdash-plugin/sandbox` entry point.       |
-| `src/integration.ts`         | The optional Astro integration. It only warns about 2.x options.                                                                |
-| `bench/bench.mjs`            | The benchmark of both helpers. [Automated checks](#automated-checks) describes it.                                              |
-| `bench/hooks.mjs`            | A module hook for the benchmark. It loads `bench/store.mjs` in place of `emdash` and `astro:content`.                           |
-| `bench/store.mjs`            | The in-memory collections of the benchmark.                                                                                     |
+| File                         | Contents                                                                                                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/get-related.ts`         | `getRelated()` for Astro content collections.                                                                                          |
+| `src/get-live-related.ts`    | `getLiveRelated()` for Astro live content collections.                                                                                 |
+| `src/astro-live-module.d.ts` | The live collection types of `astro:content` for the build. [Live collections](#live-collections-get-their-own-helper) describes them. |
+| `src/emdash.ts`              | `getEmDashRelated()` for EmDash collections. This file is the `astro-relatinator/emdash` entry point.                                  |
+| `src/related-index.ts`       | `relatedIndex()`, which all three helpers call. It makes the cache key and the fingerprint, gets the model, and maps ids to entries.   |
+| `src/model-cache.ts`         | `getCachedModel()`. It keeps one model for each cache key.                                                                             |
+| `src/entry-text.ts`          | `entryText()`, the default text of an Astro entry, and the `ContentEntry` type. `src/index.ts` exports `entryText()`.                  |
+| `src/emdash-text.ts`         | `emdashEntryText()`, the default text of an EmDash entry. `src/emdash.ts` exports it.                                                  |
+| `src/portable-text.ts`       | `portableTextToPlainText()`.                                                                                                           |
+| `src/emdash-topics.ts`       | `suggestTerms()` and `topicText()`. They score the terms of EmDash taxonomies with `classify()`. They do not import `emdash`.          |
+| `src/emdash-plugin.ts`       | The plugin descriptor. This file is the `astro-relatinator/emdash-plugin` entry point.                                                 |
+| `src/emdash-plugin-entry.ts` | The route of the "Suggested topics" editor panel. This file is the `astro-relatinator/emdash-plugin/sandbox` entry point.              |
+| `src/integration.ts`         | The optional Astro integration. It only warns about 2.x options.                                                                       |
+| `bench/bench.mjs`            | The benchmark of both helpers. [Automated checks](#automated-checks) describes it.                                                     |
+| `bench/hooks.mjs`            | A module hook for the benchmark. It loads `bench/store.mjs` in place of `emdash` and `astro:content`.                                  |
+| `bench/store.mjs`            | The in-memory collections of the benchmark.                                                                                            |
 
 ## Design decisions
 
@@ -70,7 +72,7 @@ Version 3.0 uses `entry.id` for the documents, the queries, and the results. `ge
 
 `getRelated()` calls `getCollection()` each time that a page calls it. There is no build hook and no file watcher. In `astro dev`, an edit to a content file changes the `digest` of the entry. The next call then builds a new model.
 
-`getRelated()` imports `astro:content` inside the function, not at the top of the module. The Astro config imports the package to get the integration, and `astro:content` does not exist at that time. A top-level import would make the config fail. `src/emdash.ts` imports `emdash` inside the function for the same reason.
+`getRelated()` imports `astro:content` inside the function, not at the top of the module. The Astro config imports the package to get the integration, and `astro:content` does not exist at that time. A top-level import would make the config fail. `getLiveRelated()` imports `astro:content` in the same way. `src/emdash.ts` imports `emdash` inside the function for the same reason.
 
 ### The integration is optional
 
@@ -96,7 +98,7 @@ Both helpers call `relatedIndex()` in `src/related-index.ts`. `relatedIndex()` g
 
 The cache key has three parts:
 
-1. The corpus key. For Astro, this is the collection name. For EmDash, it is `emdash`, the collection name, and the locale. Thus an Astro collection and an EmDash collection with the same name get different models, and each EmDash locale gets its own model.
+1. The corpus key. For Astro, this is the collection name. For an Astro live collection, it is `live` and the collection name. For EmDash, it is `emdash`, the collection name, and the locale. Thus collections of different types with the same name get different models, and each EmDash locale gets its own model.
 2. The `method`.
 3. The text source. This is the `fields` array as JSON, or the source code of the `text` function.
 
@@ -111,6 +113,7 @@ The fingerprint is a list of strings. It contains the id and then the version of
 | `getRelated()`, the entry has a `digest`  | The `digest`                                      |
 | `getRelated()`, the entry has no `digest` | The default text of the entry                     |
 | `getRelated()` with `text`                | The text that `text` returns                      |
+| `getLiveRelated()`                        | The default text, or the text that `text` returns |
 | `getEmDashRelated()`                      | The default text, or the text that `text` returns |
 
 With `text`, the version is the text that `text` returns. The cache key holds only the source code of `text`. Two closures with the same source code can return different text. The returned text tells them apart.
@@ -120,6 +123,26 @@ With `text`, the version is the text that `text` returns. The cache key holds on
 Versions 3.0.0 and 3.0.1 joined the fingerprint into one string. They put U+0000 between an id and its version, and U+0001 between two entries. When an id or a text contained one of these characters, two different collections could give the same string. The cache then kept a model that was out of date. The item-by-item compare uses no separator. Two fingerprints are equal only when each id and each version are equal.
 
 The cache never removes a key. Each set of options that a site uses keeps one model for the life of the process or isolate.
+
+### Live collections get their own helper
+
+`getLiveRelated()` is a separate function from `getRelated()`. In the types that Astro 7.3.8 generates (`templates/content/types.d.ts`), the two kinds of collections have different keys and different entries:
+
+- `getCollection()` accepts `keyof DataEntryMap`. `getLiveCollection()` accepts `keyof LiveContentConfig['collections']`. These are the collections of `src/content.config.ts` and of `src/live.config.ts`.
+- At runtime, `getCollection()` throws an error for the name of a live collection. `getLiveCollection()` returns an error for the name of a content collection (`createGetCollection()` and `createGetLiveCollection()` in `dist/content/runtime.js`).
+- `getLiveCollection()` returns `{ entries, error, cacheHint }`, not an array. A live entry is a `LiveDataEntry`, with `id`, `data`, `rendered`, and `cacheHint`. It has no `digest` and no `body`. Astro 6.0.0 has the same `LiveDataEntry` type (`dist/types/public/content.d.ts:145-156` of the npm package).
+
+One function for both kinds would need a union of both key types and a conditional result type. It would also need two read paths. Two functions keep the types of `getRelated()` the same.
+
+`getLiveRelated()` uses the text as the version, because a live entry has no `digest`. The default text is the text of `data`, and then the words of `rendered.html`. A loader can return the content of an entry as HTML in `rendered.html` (`LiveDataEntry` in `dist/types/public/content.d.ts` of Astro 7.3.8 and 6.0.0). This is the place of `body` in a content collection. `getLiveRelated()` removes the tags and the content of `script` and `style` elements, It decodes the numeric entities and six common named entities, and it changes each other named entity, such as `&rsquo;`, to a space. Without this step, the tag names and the entity names, such as `strong`, `amp`, and `rsquo`, relate entries that share no words. The step uses three regular expressions, not an HTML parser, to keep the package small. It keeps the content of the other elements, such as `template`. A `>` or a `<script>` in the text of an attribute can leave part of a tag in the text or remove the words up to the next `</script>`.
+
+The result type is `LiveDataEntry<LiveLoaderDataType<C>>`. This is the entry type of `getLiveCollection(C)` in the generated types. `LiveLoaderDataType` is a type of the generated `astro:content` module without the `export` keyword. TypeScript exports all declarations of an ambient module, so a package can import it. Astro 6.0.0 has the same type (`templates/content/types.d.ts:137` of the npm package). The placeholder types of `astro/client` (`types/content.d.ts`) have no `LiveContentConfig` and no `LiveLoaderDataType`. For the build, `src/astro-live-module.d.ts` adds general forms of both types. `tsc` does not copy this file to `dist`. In a project, the generated types replace the placeholder, and the import gets the real types. Without `src/live.config.ts`, `LiveContentConfig` is `never`, and `getRelated()` users see no change.
+
+An instantiation expression, `typeof getLiveCollection<C>`, would need only the exported function. The placeholder declares `getLiveCollection` as `(...args: any[]) => any`, and TypeScript rejects type arguments for this type (TS2635). Thus the build cannot use it.
+
+`test/live-types/` is a separate TypeScript project for the type test. Its `astro-content.d.ts` has the generated helper types of Astro 7.3.8 and a `live.config.ts` with a loader type and a schema. `test/tsconfig.json` excludes this directory, because its declarations conflict with `src/astro-live-module.d.ts`. `pnpm check` runs both projects.
+
+Astro documents live collections for pages that render on demand. The runtime of Astro 7.3.8 has no prerender check in `getLiveCollection()`. In the manual check, a prerendered page called `getLiveRelated()` at build time, also without an adapter.
 
 ### EmDash support is a site helper, not a plugin
 
@@ -251,26 +274,26 @@ The assigned terms stay in the `classify()` call. The panel removes them from th
 This section lists the checks behind the claims in the READMEs. There are two types of checks:
 
 - Automated checks are scripts in this repository. No CI runs them. Run them by hand before a release.
-- Manual checks ran one time, during the 3.0 work on 2026-10-15, during the 3.1 work on 2026-10-16, and during the topic plugin work on 2026-10-19. The repository has no scripts for them. The procedures below repeat the consumer builds, the Cloudflare check, and the EmDash check. The negative control, the 2.x baseline, the 3.1 checks, and the topic plugin checks have no written procedure.
+- Manual checks ran one time, during the 3.0 work on 2026-10-15, during the 3.1 work on 2026-10-16, and during the topic plugin work and the live collection work on 2026-10-19. The repository has no scripts for them. The procedures below repeat the consumer builds, the Cloudflare check, and the EmDash check. The negative control, the 2.x baseline, the 3.1 checks, and the topic plugin checks have no written procedure. The live collection check has a short procedure.
 
 ### Automated checks
 
 Run these commands from the repository root. The results are from 2026-10-16, with Node.js 24.13.1 and pnpm 11.24.0. A result that gives another date is from that date.
 
-| Command                                                    | What it checks                                                                                                                                                                                                                                                                                                                                                   | Result on 2026-10-16                                                                                                                                                                                                |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, the scores and shared terms, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests both helpers, the text rules and the exported text functions, the cache, the types of `getEmDashRelated()`, and the topic plugin.                        | 203 tests in `relatinator` and 80 in `astro-relatinator` on 2026-10-19. `test/classify.test.ts` has 19 of them.                                                                                                     |
-| `pnpm --filter relatinator test equivalence`               | Runs only `test/equivalence.test.ts`. It compares the results, the scores, the tie order, and the errors of `src` with `relatinator` 3.0.0. The inputs are synthetic corpora, the fixture posts, the playground posts, seven option sets, `limit` values next to 64, odd `limit` values, more than 100,000 different words, and strings with Unicode edge cases. | 63 tests.                                                                                                                                                                                                           |
-| `pnpm check`                                               | `tsc` checks the source and the tests of both libraries. `astro check` checks the playground.                                                                                                                                                                                                                                                                    | No errors. `astro check` reports 0 errors.                                                                                                                                                                          |
-| `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                        | 10131 bytes (9.9 KB), no imports, on 2026-10-19.                                                                                                                                                                    |
-| `pnpm build`                                               | Builds both libraries and the playground.                                                                                                                                                                                                                                                                                                                        | The playground has 7 pages.                                                                                                                                                                                         |
-| `pnpm -r --if-present run format:check`                    | Runs Prettier in both libraries.                                                                                                                                                                                                                                                                                                                                 | No changes. Each package prints one deprecation warning.                                                                                                                                                            |
-| `pnpm --filter relatinator bench --impl both --sizes 1005` | Builds `relatinator`. Then it times the model build, the queries, and `tokenize()` of 3.1 and 3.0.0 on 1,005 synthetic posts, in 5 runs. Each run starts a new Node.js process. The last line tells if the output checksums of all runs agree.                                                                                                                   | The checksums agree, and no call failed. The [3.1.0 changelog](../packages/relatinator/CHANGELOG.md#310---2026-10-16) gives the times.                                                                              |
-| `pnpm --filter astro-relatinator bench`                    | Builds both libraries. Then it calls `getEmDashRelated()` and `getRelated()` on 1,005 synthetic posts in memory, in 5 runs. It times the first call, the later calls, and the text of all entries. `--dist` sets the directory of the helpers. The changelog tells how to time 3.0.1.                                                                            | No call failed. Each helper gave one checksum in all runs. The published 3.0.1 package gave the same checksums. The [3.1.0 changelog](../packages/astro-relatinator/CHANGELOG.md#310---2026-10-16) gives the times. |
+| Command                                                    | What it checks                                                                                                                                                                                                                                                                                                                                                        | Result on 2026-10-16                                                                                                                                                                                                |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test`                                                | Runs the Vitest tests. `relatinator` tests the tokenizer, the weights, the ranking, the scores and shared terms, `classify()`, fixture posts, and the equivalence with 3.0.0. `astro-relatinator` tests the three helpers, the text rules and the exported text functions, the cache, the types of `getEmDashRelated()` and `getLiveRelated()`, and the topic plugin. | 203 tests in `relatinator` and 94 in `astro-relatinator` on 2026-10-19. `test/classify.test.ts` has 19 of them.                                                                                                     |
+| `pnpm --filter relatinator test equivalence`               | Runs only `test/equivalence.test.ts`. It compares the results, the scores, the tie order, and the errors of `src` with `relatinator` 3.0.0. The inputs are synthetic corpora, the fixture posts, the playground posts, seven option sets, `limit` values next to 64, odd `limit` values, more than 100,000 different words, and strings with Unicode edge cases.      | 63 tests.                                                                                                                                                                                                           |
+| `pnpm check`                                               | `tsc` checks the source and the tests of both libraries, also the `test/live-types` project. `astro check` checks the playground.                                                                                                                                                                                                                                     | No errors. `astro check` reports 0 errors.                                                                                                                                                                          |
+| `pnpm --filter relatinator test:portability`               | Builds `relatinator` and bundles `dist/index.js` for the `neutral` platform with esbuild. It fails if the bundle keeps an import or is larger than 60 KB.                                                                                                                                                                                                             | 10131 bytes (9.9 KB), no imports, on 2026-10-19.                                                                                                                                                                    |
+| `pnpm build`                                               | Builds both libraries and the playground.                                                                                                                                                                                                                                                                                                                             | The playground has 7 pages.                                                                                                                                                                                         |
+| `pnpm -r --if-present run format:check`                    | Runs Prettier in both libraries.                                                                                                                                                                                                                                                                                                                                      | No changes. Each package prints one deprecation warning.                                                                                                                                                            |
+| `pnpm --filter relatinator bench --impl both --sizes 1005` | Builds `relatinator`. Then it times the model build, the queries, and `tokenize()` of 3.1 and 3.0.0 on 1,005 synthetic posts, in 5 runs. Each run starts a new Node.js process. The last line tells if the output checksums of all runs agree.                                                                                                                        | The checksums agree, and no call failed. The [3.1.0 changelog](../packages/relatinator/CHANGELOG.md#310---2026-10-16) gives the times.                                                                              |
+| `pnpm --filter astro-relatinator bench`                    | Builds both libraries. Then it calls `getEmDashRelated()` and `getRelated()` on 1,005 synthetic posts in memory, in 5 runs. It times the first call, the later calls, and the text of all entries. `--dist` sets the directory of the helpers. The changelog tells how to time 3.0.1.                                                                                 | No call failed. Each helper gave one checksum in all runs. The published 3.0.1 package gave the same checksums. The [3.1.0 changelog](../packages/astro-relatinator/CHANGELOG.md#310---2026-10-16) gives the times. |
 
 The benchmark times depend on the machine and its load. For the results above, `taskset -c 3` kept each benchmark on one CPU core.
 
-All 283 tests pass on 2026-10-19. The type assertions in `test/emdash-types.test.ts` and `test/public-entry-text.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
+All 297 tests pass on 2026-10-19. The type assertions in `test/emdash-types.test.ts`, `test/public-entry-text.test.ts`, and `test/live-types/live-types.test.ts` have an effect only in `pnpm check`, because Vitest does not check types. The `astro-relatinator` tests do not load Astro or EmDash. `vitest.config.ts` replaces `astro:content` with `test/astro-content.ts` and `emdash` with `test/emdash.ts`. These stubs return the entries that each test sets. The workspace sets `autoInstallPeers: false`, so pnpm does not install the optional `emdash` peer.
 
 ### Playground related lists
 
@@ -342,13 +365,29 @@ A second check on the same day drove the admin UI in Chromium with Playwright:
 - An edit of the post title saved automatically within 3 seconds. The Save button then showed "Saved".
 - The browser console showed a React warning that a `form` is inside a `form`. The admin puts the Block Kit form of the panel inside the editor form. The submit of the panel did not submit the editor form.
 
+### Manual check of live collections
+
+This check ran on 2026-10-19. It used a new Astro 7.3.8 site with `@astrojs/node` 11.1.8 in `standalone` mode and the packed tarballs of `relatinator` 3.2.0 and `astro-relatinator`. `src/live.config.ts` had one live collection, `products`, with four entries from a loader in memory. The loader added a call count to the data of each entry. The pages called `getLiveRelated("products", ..., { fields: ["title", "text"] })`.
+
+- `astro check` reported 0 errors. A test file with `const wrong: number = related[0]!.data.title` and `getLiveRelated("posts", "a")` got two errors: `Type 'string' is not assignable to type 'number'` and `Argument of type '"posts"' is not assignable to parameter of type '"products"'`.
+- `astro build`, then `node dist/server/entry.mjs`. The on-demand page `/products/telescope` showed the related list "Star map", "Moon lamp". `/products/star-map` showed "Telescope". The call count of the loader was 1, 2, and 3 in three requests, so each request loaded the collection again.
+- The prerendered page `/static/telescope/` showed "Star map", "Moon lamp" in the build output. A second build without an adapter also prerendered this page with the same list.
+
+To repeat the check:
+
+1. Pack the two libraries, as in step 1 of the consumer builds.
+2. Make a new Astro 7.3.8 project. Install the two tarballs and `@astrojs/node`. Set `adapter: node({ mode: "standalone" })`.
+3. Add `src/live.config.ts` with a live collection and a loader. Add a page with `export const prerender = false` that calls `getLiveRelated()`.
+4. Run `astro check` and `astro build`. Start `node dist/server/entry.mjs` and open the page.
+
 ## Known gaps and follow-ups
 
-These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17. The topic plugin items were open on 2026-10-19.
+These items were open on 2026-10-16. The three `classify()` items were open on 2026-10-17. The topic plugin items and the live collection item were open on 2026-10-19.
 
 - **Astro 6 in the repository.** All workspace packages use Astro 7.3.8. Only the manual consumer build used Astro 6.4.8.
 - **Lowest supported versions.** No check covers the lowest versions of the supported ranges. All checks ran on Node.js 24.13.1, not on Node.js 22.12. The Astro checks used 6.4.8 and 7.3.8, not 6.0 and 7.0. The EmDash check used 1.2.0, not 1.0. For emdash 1.0.0, only the result type of `getEmDashCollection()` was read.
-- **On-demand pages with `getRelated()`.** No check renders `getRelated()` in an on-demand page. The EmDash check covers on-demand rendering only through `getEmDashRelated()`.
+- **On-demand pages with `getRelated()`.** No check renders `getRelated()` in an on-demand page. The EmDash check covers on-demand rendering only through `getEmDashRelated()`, and the live collection check only through `getLiveRelated()`.
+- **Live collections.** The live collection check used Astro 7.3.8 and the Node.js adapter only. No check used Astro 6, the Cloudflare adapter, `astro dev`, or a real API loader. `getLiveRelated()` does not give a loader filter to `getLiveCollection()`, so each call loads the whole collection. It does not use `cacheHint`. The result type depends on `LiveLoaderDataType`, which Astro does not document. If a later Astro version renames this type, the result type can become `any`, or `tsc` can report an error.
 - **Browsers.** No test runs `relatinator` in a browser. The portability check shows only that the bundle has no imports.
 - **CI.** The repository has no CI workflow. The automated checks run only when a maintainer runs them.
 - **Changesets.** The root `package.json` has `@changesets/cli` and `@changesets/changelog-github` in `devDependencies`. The repository has no `.changeset` directory, so Changesets is not set up. Maintainers edit the changelogs by hand.

@@ -9,6 +9,7 @@ This package wraps [relatinator](https://github.com/DBozhinovski/relatinator/tre
 - Astro 6 and Astro 7. The `astro` peer dependency is `^6.0.0 || ^7.0.0`.
 - Node.js 22.12 or later.
 - Static output and on-demand rendering.
+- Live content collections, with `getLiveRelated()`.
 - The Cloudflare adapter, also when the adapter prerenders pages in workerd.
 - EmDash 1.x (1.0 or later), for `astro-relatinator/emdash` only. The optional `emdash` peer dependency is `^1.0.0`.
 - EmDash 1.3.1 or later, for the `astro-relatinator/emdash-plugin` plugin. The checks used EmDash 1.3.1 only.
@@ -175,6 +176,50 @@ Do not read the field that has the existing tags of the entry. Without `fields`,
 The topic list controls most of the result. To write it, read [Best practices for topic lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#best-practices-for-topic-lists).
 
 For EmDash entries, `emdashEntryText(entry, fields?)` from `astro-relatinator/emdash` returns the default EmDash text. Without `fields`, this text contains the labels of the taxonomy terms of the entry. For term suggestions in the entry editor, read [EmDash topic suggestions](#emdash-topic-suggestions).
+
+## Live collections
+
+For a live collection in `src/live.config.ts`, use `getLiveRelated()`. Astro loads a live collection when a page renders, not at build time. `getLiveRelated()` reads the collection with `getLiveCollection()`. It returns the related entries of the same live collection, most related first.
+
+```astro
+---
+// src/pages/products/[id].astro
+export const prerender = false;
+
+import { getLiveEntry } from "astro:content";
+import { getLiveRelated } from "astro-relatinator";
+
+const { entry: product } = await getLiveEntry("products", Astro.params.id!);
+if (!product) return Astro.redirect("/404");
+const related = await getLiveRelated("products", product, {
+  limit: 3,
+  fields: ["title", "description"],
+});
+---
+
+<h1>{product.data.title}</h1>
+
+<h2>Related</h2>
+<ul>
+  {related.map((entry) => <li><a href={`/products/${entry.id}`}>{entry.data.title}</a></li>)}
+</ul>
+```
+
+`getLiveRelated()` has the same options as `getRelated()`: `limit`, `method`, `fields`, `text`, and `filter`. The result has the entry type of `getLiveCollection("products")`, so TypeScript knows the type of `entry.data`. The collection name must be a key of the `collections` export of `src/live.config.ts`.
+
+The differences from `getRelated()`:
+
+- **The default text.** A live entry has no body. The default text has the string and number values of `entry.data`, and then the words of `entry.rendered.html`. A loader can put the content of an entry there as HTML. `getLiveRelated()` removes the HTML tags and the content of `script` and `style` elements, It decodes common HTML entities such as `&amp;`, and it removes the other named entities. Thus the names of the tags and the entities do not relate entries. `fields` limits only the data keys. To use other text, set `text`.
+- **Errors.** When `getLiveCollection()` returns an error, `getLiveRelated()` throws an error that names the collection. The error of Astro is the `cause`. `getLiveRelated()` also throws an error if the collection has no entry with the given id.
+- **Each call loads the collection.** `getLiveCollection()` calls the `loadCollection()` function of the loader on each call. If the loader fetches from an API, each page render fetches the whole collection one time for `getLiveRelated()`.
+- **Changes.** Live entries have no `digest`. `getLiveRelated()` compares the text of each entry. Thus each call makes the text of every entry. The model stays the same until a text changes.
+- **The cache key.** A live collection and a content collection with the same name get different models.
+
+Some data values change on each request, for example a stock count or a time. Then the text changes on each call, and each call builds a new model. Use `fields` or `text` to leave out these values.
+
+Astro 6 and 7 have live collections.
+
+Astro documents live collections for pages that render on demand, with an adapter. In Astro 7.3.8, a prerendered page can also call `getLiveRelated()`. Then Astro runs the loader at build time. The page keeps the related list of the build.
 
 ## How it works
 

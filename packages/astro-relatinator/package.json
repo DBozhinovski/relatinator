@@ -55,7 +55,7 @@
     "test": "vitest run",
     "bench": "pnpm --filter \"astro-relatinator...\" run build && node bench/bench.mjs",
     "precheck": "pnpm --filter \"astro-relatinator^...\" run build",
-    "check": "tsc --noEmit && tsc -p test",
+    "check": "tsc --noEmit && tsc -p test && tsc -p test/live-types",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
