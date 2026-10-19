@@ -2,7 +2,9 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
-## Unreleased
+## [3.3.0] - 2026-10-19
+
+This release adds filters that apply before the limit, scores, and the shared terms of two documents. Without the new options, the results do not change.
 
 - **New:** `findRelated()` and `findRelatedToText()` accept `filter: (id) => boolean`. A document stays in the results only when `filter` returns `true`.
 - **New:** `findRelated()` accepts `exclude`, as `findRelatedToText()` does. Version 3.2.0 did not read `exclude` in `findRelated()`, and TypeScript rejected it.

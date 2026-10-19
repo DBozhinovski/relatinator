@@ -37,7 +37,7 @@ export default function relatinatorTopics({
   };
   return Object.freeze({
     id: "relatinator-topics",
-    version: "3.1.0",
+    version: "3.2.0",
     format: "standard",
     entrypoint: "astro-relatinator/emdash-plugin/sandbox",
     capabilities: ["content:read", "taxonomies:write"],
