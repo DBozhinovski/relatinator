@@ -24,7 +24,8 @@ export interface RelatinatorTopicsOptions {
 
 /**
  * The EmDash plugin that suggests taxonomy terms for the saved text of an
- * entry. Put it in `plugins: []` of the EmDash integration.
+ * entry. Put it in `plugins: []` or `sandboxed: []` of the EmDash
+ * integration.
  */
 export default function relatinatorTopics({
   collections,

@@ -472,7 +472,32 @@ To show the panel only in some collections, give their slugs:
 relatinatorTopics({ collections: ["posts"] });
 ```
 
-The plugin asks for the `content:read` and `taxonomies:write` capabilities. Users with the `content:edit_own` permission can use the panel. In EmDash 1.3.1, the Author role and the roles above it have this permission. Contributors have only `content:edit_own_drafts`, so they cannot use the panel. EmDash also checks that the user can edit that entry.
+The plugin can also run in the plugin sandbox. Put it in `sandboxed` in place of `plugins`, and set a sandbox runner. On Cloudflare, the runner is `sandbox()` from `@emdash-cms/cloudflare`. It needs a Worker Loader binding with the name `LOADER` in `wrangler.jsonc`, which is available on the Workers paid plans:
+
+```js
+// astro.config.mjs
+import { d1, r2, sandbox } from "@emdash-cms/cloudflare";
+import emdash from "emdash/astro";
+import relatinatorTopics from "astro-relatinator/emdash-plugin";
+
+export default defineConfig({
+  integrations: [
+    emdash({
+      database: d1({ binding: "DB" }),
+      storage: r2({ binding: "MEDIA" }),
+      sandboxed: [relatinatorTopics()],
+      sandboxRunner: sandbox(),
+    }),
+  ],
+});
+```
+
+```jsonc
+// wrangler.jsonc
+"worker_loaders": [{ "binding": "LOADER" }],
+```
+
+In the sandbox, the plugin can use only its capabilities. The plugin asks for the `content:read` and `taxonomies:write` capabilities. Users with the `content:edit_own` permission can use the panel. In EmDash 1.3.1, the Author role and the roles above it have this permission. Contributors have only `content:edit_own_drafts`, so they cannot use the panel. EmDash also checks that the user can edit that entry.
 
 ### What users see
 
@@ -504,7 +529,7 @@ The text of the entry is the [default EmDash text](#emdash-options), without the
 
 - The panel reads the saved entry. It does not read the changes that are not saved in the editor.
 - After the panel adds terms, the admin loads the entry page again. This reload loses the changes that the editor did not save yet. The editor saves changes automatically after a short time. Wait until the Save button shows "Saved" before you add terms.
-- The plugin runs in `plugins: []` only. EmDash reads the entry file of a plugin in `sandboxed: []` as one module, and this entry file imports other modules. Thus the plugin does not load in the sandbox.
+- In the sandbox, EmDash sets limits for each call of the plugin. On Cloudflare, the default limits are 50 ms of CPU time and 10 subrequests. A panel request reads the entry, the taxonomies, the assigned terms, and the terms of each taxonomy of the collection. An add also writes the terms of each taxonomy with selected terms. A collection with many taxonomies or many terms can go above these limits. The checks ran in local workerd only, not on Cloudflare.
 - The panel does not make new terms. It suggests only the terms that exist.
 - The tokenizer is for English text.
 
@@ -553,15 +578,16 @@ Run these commands from the repository root:
 
 | Command                                        | What it does                                                                                                                                                                                                                                                                                                                             |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm --filter astro-relatinator build`        | Deletes `dist` and compiles `src` with `tsc`.                                                                                                                                                                                                                                                                                            |
+| `pnpm --filter astro-relatinator build`        | Deletes `dist` and compiles `src` with `tsc`. Then `scripts/bundle-sandbox.js` bundles the plugin entry into one file, `dist/emdash-plugin-entry.js`, with esbuild.                                                                                                                                                                      |
 | `pnpm --filter astro-relatinator test`         | Builds `relatinator` in `pretest`. Then it runs the Vitest tests. The tests replace `astro:content` and `emdash` with stubs.                                                                                                                                                                                                             |
 | `pnpm --filter astro-relatinator check`        | Builds `relatinator` in `precheck`. Then it type-checks `src` and `test` with `tsc`.                                                                                                                                                                                                                                                     |
+| `pnpm --filter astro-relatinator test:sandbox` | Runs `build`. Then `scripts/check-sandbox.js` makes sure that `dist/emdash-plugin-entry.js` imports no other module, and that EmDash can find it with `require.resolve()`.                                                                                                                                                               |
 | `pnpm --filter astro-relatinator format:check` | Checks the format with Prettier. `format` writes the changes.                                                                                                                                                                                                                                                                            |
 | `pnpm --filter astro-relatinator bench`        | Builds `relatinator` and this package. Then it times `getEmDashRelated()` and `getRelated()` on synthetic posts in memory, without Astro and without a database. `--size` sets the number of posts (default `1005`). `--runs` sets the number of runs (default `5`). `--dist` sets the `dist` directory to time (default: this package). |
 
 The tests do not run Astro. To test a change in a real Astro site, build the playground and compare its [expected related lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/playground#expected-related-lists).
 
-The `prepack` script runs `build`. Thus `pnpm pack` and `pnpm publish` always include a new build.
+The `prepack` script runs `test:sandbox`. Thus `pnpm pack` and `pnpm publish` always include a new build, and they stop if the plugin entry is not one file.
 
 ## License
 

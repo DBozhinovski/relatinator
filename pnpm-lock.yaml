@@ -33,6 +33,9 @@ importers:
       astro:
         specifier: 7.3.8
         version: 7.3.8(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1)
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
       prettier:
         specifier: ^3.9.10
         version: 3.9.10

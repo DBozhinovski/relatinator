@@ -38,7 +38,7 @@
     },
     "./emdash-plugin/sandbox": {
       "types": "./dist/emdash-plugin-entry.d.ts",
-      "import": "./dist/emdash-plugin-entry.js"
+      "default": "./dist/emdash-plugin-entry.js"
     }
   },
   "files": [
@@ -49,10 +49,11 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc",
-    "prepack": "pnpm run build",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc && node scripts/bundle-sandbox.js",
+    "prepack": "pnpm run test:sandbox",
     "pretest": "pnpm --filter \"astro-relatinator^...\" run build",
     "test": "vitest run",
+    "test:sandbox": "pnpm run build && node scripts/check-sandbox.js",
     "bench": "pnpm --filter \"astro-relatinator...\" run build && node bench/bench.mjs",
     "precheck": "pnpm --filter \"astro-relatinator^...\" run build",
     "check": "tsc --noEmit && tsc -p test && tsc -p test/live-types",
@@ -65,6 +66,7 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "astro": "7.3.8",
+    "esbuild": "^0.28.2",
     "prettier": "^3.9.10",
     "typescript": "6.0.3",
     "vitest": "^5.0.4"

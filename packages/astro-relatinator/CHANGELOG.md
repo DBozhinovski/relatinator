@@ -5,7 +5,8 @@ All notable changes to the "astro-relatinator" project will be documented in thi
 ## Unreleased
 
 - **New:** The new `astro-relatinator/emdash-plugin` entry point is an EmDash plugin. It adds a "Suggested topics" panel to the entry editor. The panel suggests terms from the taxonomies of the collection with `classify()`. The user selects the terms, and the panel adds them to the entry. [EmDash topic suggestions](README.md#emdash-topic-suggestions) tells how to install it.
-- The plugin uses the standard EmDash plugin format. It runs in `plugins: []`. It does not run in `sandboxed: []` yet.
+- The plugin uses the standard EmDash plugin format. It runs in `plugins: []` and in `sandboxed: []`. The build bundles the sandbox entry, `dist/emdash-plugin-entry.js`, into one file with no imports, because EmDash loads the code of a sandboxed plugin as one module. The other files of `dist` are the `tsc` output, as before. [Install the plugin](README.md#install-the-plugin) tells how to set a sandbox runner.
+- The `astro-relatinator/emdash-plugin/sandbox` export has a `default` condition in place of `import`. EmDash finds a sandbox entry with `require.resolve()`, which does not match the `import` condition.
 - The published `relatinator` dependency is the `relatinator` version of this release. The plugin needs `classify()`, and `filter` needs the `filter` query option of `relatinator`.
 - The new `astro-relatinator/emdash-plugin/sandbox` entry point is the plugin code that EmDash loads. Do not import it in your pages.
 - **New:** `astro-relatinator` exports `entryText(entry, fields?)`, and `astro-relatinator/emdash` exports `emdashEntryText(entry, fields?)`. Each function returns the default text of an entry, which `getRelated()` or `getEmDashRelated()` reads when you do not set `text`. Give this text to `classify()` from `relatinator` to get topics for an entry. [Topics for your entries](README.md#topics-for-your-entries) gives an example.
