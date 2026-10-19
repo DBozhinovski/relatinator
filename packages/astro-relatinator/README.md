@@ -12,7 +12,7 @@ This package wraps [relatinator](https://github.com/DBozhinovski/relatinator/tre
 - Live content collections, with `getLiveRelated()`.
 - The Cloudflare adapter, also when the adapter prerenders pages in workerd.
 - EmDash 1.x (1.0 or later), for `astro-relatinator/emdash` only. The optional `emdash` peer dependency is `^1.0.0`.
-- EmDash 1.3.1 or later, for the `astro-relatinator/emdash-plugin` plugin. The checks used EmDash 1.3.1 only.
+- For the `astro-relatinator/emdash-plugin` plugin, use EmDash 1.3.1 or later. The checks used EmDash 1.3.1. EmDash 1.2.0 also loads the panel, but no check added a term with 1.2.0.
 - ES modules only, with TypeScript type declarations.
 
 For the checks behind this list, read [Verification](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#verification).
@@ -441,11 +441,13 @@ With `text`, two functions with the same source code share one window. Inside th
 
 `astro-relatinator/emdash-plugin` is an EmDash plugin. It adds a "Suggested topics" panel to the entry editor. The panel suggests terms from the taxonomies of the collection, such as categories and tags. The user selects the terms to add. The plugin does not add a term without the user.
 
+The plugin reads only EmDash taxonomies. It does not read other fields, such as a `multiSelect` field with tags. If your site keeps its tags in a `multiSelect` field, move them to a taxonomy before you use the plugin. Then change your templates to read the terms of the entry. In the entry data, `terms` has the terms of each taxonomy by taxonomy name, for example `post.data.terms.tag`. `getEntryTerms()` from `emdash` also returns them.
+
 The panel scores the terms with `classify()` from [`relatinator`](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#classifytopics-text-options). Each term is a topic. The tag of the topic is the term slug. The description of the topic is the term label and the term description.
 
 ### Install the plugin
 
-The plugin needs `emdash` 1.3.1 or later. Install the package next to `emdash`:
+Use `emdash` 1.3.1 or later. [Compatibility](#compatibility) tells what was checked. Install the package next to `emdash`:
 
 ```sh
 npm install astro-relatinator
@@ -503,7 +505,19 @@ In the sandbox, the plugin can use only its capabilities. The plugin asks for th
 
 ### What users see
 
-The panel shows one group of check boxes for each taxonomy of the collection. Each suggested term shows its score as a percent of the best score in its taxonomy. The panel does not suggest a term that the entry already has. It shows the assigned terms in a line below the suggestions.
+The panel shows one group of check boxes for each taxonomy of the collection. Each suggested term shows its label and the words of the entry that matched it. The panel shows up to 3 words, best match first. The panel does not suggest a term that the entry already has. It shows the assigned terms in a line below the suggestions. This example is from a post about a related-post classifier, with the tags of darko.io:
+
+```text
+Tags
+[ ] guest: post, blog, published
+[ ] rest: post, get, api
+[ ] shorts: post, note, quick
+Assigned terms: astro, nlp
+```
+
+The words tell you why the panel suggests a term. In this example, the words are general words of a blog post, so the three suggestions are not good. A suggestion with specific words, such as "supertokens: supertokens, authenticated, providers" for a post about authentication, is usually good. Each word is the first word of the entry with the same word stem, in lower case. Thus the term "conference" can show the word "conferences".
+
+The panel does not show a score. `classify()` gives each term a score relative to the best term of the taxonomy. Thus the best term always has 100%, also when it is a bad match.
 
 1. Open a saved entry in the editor.
 2. In "Suggested topics", select the terms to add.
@@ -519,7 +533,7 @@ When a term has no description, the panel shows "Descriptions improve suggestion
 
 ### Write term descriptions
 
-A term without a description matches only through its slug and its label. To get better suggestions, give each term a description in the EmDash admin. Write the names of the specific things that your entries mention, such as projects, tools, places, and events. Use 10 to 25 words. [Best practices for topic lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#best-practices-for-topic-lists) tells you how to write them.
+A term without a description matches only through its slug and its label. To get better suggestions, give each term a description in the EmDash admin. Write the names of the specific things that your entries mention, such as projects, tools, places, and events. Use 10 to 25 words. When the panel suggests a wrong term, its words show the general words to remove from its description. [Best practices for topic lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#best-practices-for-topic-lists) tells you how to write them.
 
 ### How the panel gets the text
 
@@ -533,6 +547,7 @@ The text of the entry is the [default EmDash text](#emdash-options), without the
 - After the panel adds terms, the admin loads the entry page again. This reload loses the changes that the editor did not save yet. The editor saves changes automatically after a short time. Wait until the Save button shows "Saved" before you add terms.
 - In the sandbox, EmDash sets limits for each call of the plugin. On Cloudflare, the default limits are 50 ms of CPU time and 10 subrequests. A panel request reads the entry, the taxonomies, the assigned terms, and the terms of each taxonomy of the collection. An add also writes the terms of each taxonomy with selected terms. A collection with many taxonomies or many terms can go above these limits. The checks ran in local workerd only, not on Cloudflare.
 - The panel does not make new terms. It suggests only the terms that exist.
+- The panel reads only taxonomies, not `multiSelect` fields.
 - The tokenizer is for English text.
 
 ## Migrating from 2.x

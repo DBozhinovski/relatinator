@@ -156,10 +156,21 @@ function checkboxGroup(
     action_id: name,
     label,
     options: suggestions.map((suggestion) => ({
-      label: `${suggestion.label} (${Math.round(suggestion.score * 100)}%)`,
+      label: optionLabel(suggestion),
       value: suggestion.termId,
     })),
   };
+}
+
+/**
+ * The term label and the words of the entry that matched it. A checkbox
+ * option of Block Kit has only `label` and `value` (emdash 1.3.1), so the
+ * words go into the label.
+ */
+function optionLabel({ label, matchedWords }: TermSuggestion): string {
+  return matchedWords.length === 0
+    ? label
+    : `${label}: ${matchedWords.join(", ")}`;
 }
 
 function empty(title: string, description: string): Block {

@@ -121,13 +121,13 @@ const suggestionBlocks = [
         type: "checkbox",
         action_id: "topics",
         label: "Topics",
-        options: [{ label: "Space (100%)", value: "t-space" }],
+        options: [{ label: "Space: black, holes", value: "t-space" }],
       },
       {
         type: "checkbox",
         action_id: "category",
         label: "Categories",
-        options: [{ label: "Science (100%)", value: "c-science" }],
+        options: [{ label: "Science: stars", value: "c-science" }],
       },
     ],
     submit: { label: "Add selected terms", action_id: "add_terms" },
@@ -152,13 +152,13 @@ describe("the suggested topics panel", () => {
               type: "checkbox",
               action_id: "topics",
               label: "Topics",
-              options: [{ label: "Space (100%)", value: "t-space" }],
+              options: [{ label: "Space: black, holes", value: "t-space" }],
             },
             {
               type: "checkbox",
               action_id: "category",
               label: "Categories",
-              options: [{ label: "Science (100%)", value: "c-science" }],
+              options: [{ label: "Science: stars", value: "c-science" }],
             },
           ],
           submit: { label: "Add selected terms", action_id: "add_terms" },
@@ -178,6 +178,27 @@ describe("the suggested topics panel", () => {
     ]);
   });
 
+  it("shows the matched words of the text without the labels of the entry's terms", async () => {
+    const site = fakeSite({
+      data: {
+        title: "Black holes",
+        content: [block("Black holes bend light. Stars fall in.")],
+        terms: { category: [{ id: "c-food", label: "Galaxies" }] },
+      },
+    });
+
+    const response = await panel({ type: "panel_load" }, site);
+
+    const [form] = response.blocks;
+    expect(form).toMatchObject({
+      fields: [
+        { options: [{ label: "Space: black, holes", value: "t-space" }] },
+        { options: [{ label: "Science: stars", value: "c-science" }] },
+      ],
+    });
+    expect(JSON.stringify(response)).not.toContain("%");
+  });
+
   it("names the assigned terms and does not suggest them", async () => {
     const site = fakeSite({ assigned: [space] });
 
@@ -191,7 +212,7 @@ describe("the suggested topics panel", () => {
               type: "checkbox",
               action_id: "category",
               label: "Categories",
-              options: [{ label: "Science (100%)", value: "c-science" }],
+              options: [{ label: "Science: stars", value: "c-science" }],
             },
           ],
           submit: { label: "Add selected terms", action_id: "add_terms" },
