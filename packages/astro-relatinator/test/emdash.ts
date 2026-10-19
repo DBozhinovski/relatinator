@@ -16,13 +16,19 @@ interface StubFilter {
 const collections = new Map<string, StubEntry[]>();
 const errors = new Map<string, Error>();
 
-let requestContext: { locale?: string } | undefined;
+interface StubRequestContext {
+  locale?: string;
+  editMode?: boolean;
+  preview?: { collection: string; id: string };
+}
+
+let requestContext: StubRequestContext | undefined;
 
 /**
  * Sets the request context. As in EmDash, a query without `locale` uses
  * the locale of the context.
  */
-export function setRequestContext(context?: { locale?: string }): void {
+export function setRequestContext(context?: StubRequestContext): void {
   requestContext = context;
 }
 

@@ -1,0 +1,53 @@
+---
+// The post page of the workerd benchmark. Copy it to
+// src/pages/posts/[slug].astro in an EmDash blog site.
+// `?related=0` skips the call. `?maxAge=<seconds>` sets `maxAge`.
+import { decodeSlug, getEmDashEntry } from "emdash";
+import { getEmDashRelated } from "astro-relatinator/emdash";
+
+// workerd advances Date.now() only at I/O events, so a timer tick
+// before each read makes the clock include the CPU work before it.
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+await tick();
+const pageStart = Date.now();
+
+const slug = decodeSlug(Astro.params.slug);
+const { entry: post } = slug
+  ? await getEmDashEntry("posts", slug)
+  : { entry: undefined };
+if (!post) return Astro.rewrite("/404");
+
+const withRelated = Astro.url.searchParams.get("related") !== "0";
+const maxAge = Number(Astro.url.searchParams.get("maxAge") ?? 0);
+await tick();
+const relatedStart = Date.now();
+const related = withRelated
+  ? await getEmDashRelated("posts", post, { limit: 3, maxAge })
+  : [];
+await tick();
+const relatedMs = Date.now() - relatedStart;
+const pageMs = Date.now() - pageStart;
+Astro.response.headers.set(
+  "X-Bench-Timing",
+  `related;dur=${relatedMs}, frontmatter;dur=${pageMs}`
+);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{String(post.data.title)}</title>
+  </head>
+  <body>
+    <h1>{String(post.data.title)}</h1>
+    <ul data-related>
+      {
+        related.map((entry) => (
+          <li>
+            <a href={`/posts/${entry.id}`}>{String(entry.data.title)}</a>
+          </li>
+        ))
+      }
+    </ul>
+  </body>
+</html>

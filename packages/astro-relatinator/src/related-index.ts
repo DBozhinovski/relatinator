@@ -48,6 +48,22 @@ export interface RelatedIndex<E> {
   query(options: Pick<RelatedOptions<E>, "limit" | "filter">): QueryOptions;
 }
 
+type ModelOptions<E> = Pick<RelatedOptions<E>, "method" | "fields" | "text">;
+
+const DEFAULT_METHOD: SimilarityMethod = "bm25";
+
+/**
+ * The model cache key: the corpus key, the method, and the text source.
+ * The text source is `fields` as JSON or the source code of `text`.
+ */
+export function modelKey<E>(
+  corpusKey: string,
+  { method = DEFAULT_METHOD, fields, text }: ModelOptions<E>
+): string {
+  const source = text ? `text:${text}` : `fields:${JSON.stringify(fields)}`;
+  return `${corpusKey}\u0000${method}\u0000${source}`;
+}
+
 /**
  * The model of a corpus and a lookup from ids back to its entries. The
  * model is built once and reused until the version of an entry changes.
@@ -56,15 +72,11 @@ export interface RelatedIndex<E> {
  */
 export function relatedIndex<E extends ContentEntry>(
   { key, entries, textOf, versionOf }: Corpus<E>,
-  {
-    method = "bm25",
-    fields,
-    text,
-  }: Pick<RelatedOptions<E>, "method" | "fields" | "text">
+  options: ModelOptions<E>
 ): RelatedIndex<E> {
-  const source = text ? `text:${text}` : `fields:${JSON.stringify(fields)}`;
+  const { method = DEFAULT_METHOD } = options;
   const model = getCachedModel(
-    `${key}\u0000${method}\u0000${source}`,
+    modelKey(key, options),
     entries.flatMap((entry) => [`${entry.id}`, `${versionOf(entry)}`]),
     () =>
       createModel(

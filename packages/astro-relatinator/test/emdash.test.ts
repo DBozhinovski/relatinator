@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getEmDashRelated, portableTextToPlainText } from "../src/emdash.js";
 import { getRelated } from "../src/index.js";
 import { setCollection } from "./astro-content.js";
@@ -476,5 +476,287 @@ describe("getEmDashRelated cache", () => {
     // The digests do not change, so the Astro model stays in use.
     setCollection("shared", fruit("blue cherries"));
     expect(ids(await getRelated("shared", "x"))).toEqual(["y"]);
+  });
+});
+
+describe("getEmDashRelated maxAge", () => {
+  const start = new Date("2026-10-19T12:00:00Z").getTime();
+  const at = (seconds: number) => vi.setSystemTime(start + seconds * 1000);
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    at(0);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  let texts = 0;
+  const text = (entry: { data: Record<string, unknown> }) => {
+    texts += 1;
+    return String(entry.data.title);
+  };
+  const birds = (third: string) => [
+    { id: "owl", data: { title: "night owl hunts" } },
+    { id: "lark", data: { title: "morning lark sings" } },
+    { id: "bat", data: { title: third } },
+  ];
+  /** The related ids, and the reads and texts that the call made. */
+  const related = async (
+    collection: string,
+    entry: string | { id: string; data: Record<string, unknown> },
+    options: {
+      maxAge?: number;
+      locale?: string;
+      method?: "bm25" | "tfidf";
+    } = {}
+  ) => {
+    const calls = emdashCalls.length;
+    texts = 0;
+    const result = ids(
+      await getEmDashRelated(collection, entry, { text, ...options })
+    );
+    return { result, reads: emdashCalls.length - calls, texts };
+  };
+
+  it("does not share a window with a preview request", async () => {
+    setEmDashCollection("previews", birds("night bat hunts"));
+    expect(await related("previews", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 1,
+      texts: 6,
+    });
+
+    // EmDash gives a preview request the draft of the previewed entry.
+    setEmDashCollection("previews", birds("morning bat sings"));
+    setRequestContext({ preview: { collection: "previews", id: "row-bat" } });
+    try {
+      expect(await related("previews", "owl", { maxAge: 60 })).toEqual({
+        result: [],
+        reads: 1,
+        texts: 6,
+      });
+    } finally {
+      setRequestContext(undefined);
+    }
+
+    setEmDashCollection("previews", birds("night bat hunts"));
+    expect(await related("previews", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 0,
+      texts: 0,
+    });
+  });
+
+  it("does not update a public window from a preview request with maxAge 0", async () => {
+    setEmDashCollection("preview-zero", birds("night bat hunts"));
+    await related("preview-zero", "owl", { maxAge: 60 });
+
+    setEmDashCollection("preview-zero", birds("morning bat sings"));
+    setRequestContext({
+      preview: { collection: "preview-zero", id: "row-bat" },
+    });
+    try {
+      at(10);
+      expect(await related("preview-zero", "owl", { maxAge: 0 })).toEqual({
+        result: [],
+        reads: 1,
+        texts: 6,
+      });
+    } finally {
+      setRequestContext(undefined);
+    }
+
+    at(20);
+    expect(await related("preview-zero", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 0,
+      texts: 0,
+    });
+  });
+
+  it.each([0, 60])(
+    "does not use or update a public window in edit mode with maxAge %s",
+    async (maxAge) => {
+      const collection = `edit-window-${maxAge}`;
+      setEmDashCollection(collection, birds("night bat hunts"));
+      await related(collection, "owl", { maxAge: 60 });
+
+      // In edit mode, EmDash gives the read all drafts.
+      setEmDashCollection(collection, birds("morning bat sings"));
+      setRequestContext({ editMode: true });
+      try {
+        at(10);
+        expect(await related(collection, "owl", { maxAge })).toEqual({
+          result: [],
+          reads: 1,
+          texts: 6,
+        });
+      } finally {
+        setRequestContext(undefined);
+      }
+
+      at(20);
+      expect(await related(collection, "owl", { maxAge: 60 })).toEqual({
+        result: ["bat"],
+        reads: 0,
+        texts: 0,
+      });
+    }
+  );
+
+  it("does not start a window in edit mode", async () => {
+    setEmDashCollection("edit-mode", birds("morning bat sings"));
+    setRequestContext({ editMode: true });
+    try {
+      expect(await related("edit-mode", "owl", { maxAge: 60 })).toEqual({
+        result: [],
+        reads: 1,
+        texts: 6,
+      });
+    } finally {
+      setRequestContext(undefined);
+    }
+
+    setEmDashCollection("edit-mode", birds("night bat hunts"));
+    expect(await related("edit-mode", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 1,
+      texts: 6,
+    });
+  });
+
+  it("does not read the collection again inside the window", async () => {
+    setEmDashCollection("window", birds("night bat hunts"));
+    expect(await related("window", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 1,
+      texts: 6,
+    });
+
+    at(59);
+    expect(await related("window", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 0,
+      texts: 0,
+    });
+  });
+
+  it("reads the collection again when the window ends", async () => {
+    setEmDashCollection("window-end", birds("night bat hunts"));
+    await related("window-end", "owl", { maxAge: 60 });
+
+    at(60);
+    expect(await related("window-end", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 1,
+      texts: 3,
+    });
+  });
+
+  it("returns the old list for a change inside the window, and the new list after it", async () => {
+    setEmDashCollection("window-change", birds("night bat hunts"));
+    await related("window-change", "owl", { maxAge: 60 });
+    setEmDashCollection("window-change", birds("morning bat sings"));
+
+    at(30);
+    expect(await related("window-change", "owl", { maxAge: 60 })).toEqual({
+      result: ["bat"],
+      reads: 0,
+      texts: 0,
+    });
+    at(70);
+    expect(await related("window-change", "owl", { maxAge: 60 })).toEqual({
+      result: [],
+      reads: 1,
+      texts: 6,
+    });
+    expect(
+      (await related("window-change", "lark", { maxAge: 60 })).result
+    ).toEqual(["bat"]);
+  });
+
+  it("reads the collection on each call by default", async () => {
+    setEmDashCollection("no-window", birds("night bat hunts"));
+    await related("no-window", "owl");
+
+    const read = { result: ["bat"], reads: 1, texts: 3 };
+    expect(await related("no-window", "owl")).toEqual(read);
+    expect(await related("no-window", "owl", { maxAge: 0 })).toEqual(read);
+  });
+
+  it("keeps one window for each locale", async () => {
+    setEmDashCollection("window-locales", [
+      { id: "owl", locale: "en", data: { title: "night owl" } },
+      { id: "bat", locale: "en", data: { title: "night bat" } },
+      { id: "fr/hibou", locale: "fr", data: { title: "hibou nuit" } },
+      { id: "fr/chauve", locale: "fr", data: { title: "chauve nuit" } },
+    ]);
+    await related("window-locales", "owl", { maxAge: 60, locale: "en" });
+
+    at(10);
+    expect(
+      await related("window-locales", "fr/hibou", { maxAge: 60, locale: "fr" })
+    ).toEqual({ result: ["fr/chauve"], reads: 1, texts: 4 });
+    at(20);
+    expect(
+      await related("window-locales", "owl", { maxAge: 60, locale: "en" })
+    ).toEqual({ result: ["bat"], reads: 0, texts: 0 });
+  });
+
+  it("keeps one window for each method", async () => {
+    setEmDashCollection("window-methods", birds("night bat hunts"));
+    await related("window-methods", "owl", { maxAge: 60, method: "bm25" });
+
+    at(10);
+    expect(
+      await related("window-methods", "owl", { maxAge: 60, method: "tfidf" })
+    ).toEqual({ result: ["bat"], reads: 1, texts: 6 });
+    at(20);
+    expect(
+      await related("window-methods", "owl", { maxAge: 60, method: "bm25" })
+    ).toEqual({ result: ["bat"], reads: 0, texts: 0 });
+  });
+
+  it.each([-1, Number.NaN, null, "60"])(
+    "rejects the maxAge %s before it reads the collection",
+    async (maxAge) => {
+      setEmDashCollection("window-invalid", birds("night bat hunts"));
+      const calls = emdashCalls.length;
+      const call = getEmDashRelated("window-invalid", "owl", {
+        maxAge: maxAge as number,
+      });
+
+      await expect(call).rejects.toThrow(RangeError);
+      await expect(call).rejects.toThrow(
+        `Invalid maxAge: ${maxAge}. Use a number of seconds from 0.`
+      );
+      expect(emdashCalls.length).toBe(calls);
+    }
+  );
+
+  it("ranks a draft by its text with the model of the window", async () => {
+    setEmDashCollection("window-draft", birds("night bat hunts"));
+    await related("window-draft", "owl", { maxAge: 60 });
+    const draft = { id: "draft-lark", data: { title: "lark sings" } };
+
+    at(30);
+    expect(await related("window-draft", draft, { maxAge: 60 })).toEqual({
+      result: ["lark"],
+      reads: 0,
+      texts: 1,
+    });
+  });
+
+  it("starts the window again after a full read without maxAge", async () => {
+    setEmDashCollection("window-restart", birds("night bat hunts"));
+    await related("window-restart", "owl", { maxAge: 60 });
+    setEmDashCollection("window-restart", birds("morning bat sings"));
+
+    at(30);
+    expect((await related("window-restart", "owl")).result).toEqual([]);
+    at(70);
+    expect(await related("window-restart", "owl", { maxAge: 60 })).toEqual({
+      result: [],
+      reads: 0,
+      texts: 0,
+    });
   });
 });

@@ -242,7 +242,8 @@ In `astro dev`, the related entries update when you edit a content file. You do 
 ## Limitations
 
 - With on-demand rendering, each Node.js process or Cloudflare Workers isolate builds its own model on the first call. The cache is in memory. A new process or isolate starts with an empty cache.
-- Each call reads the whole collection. With `text`, and on EmDash, each call also makes the text of every entry to find changes. The time for a call and for a model build grows with the size of the collection.
+- Each call reads the whole collection. With `text`, and on EmDash, each call also makes the text of every entry to find changes. The time for a call and for a model build grows with the size of the collection. On EmDash, `maxAge` skips this work inside a [freshness window](#freshness-window).
+- On the Cloudflare Workers Free plan, the CPU time limit is 10 ms for each HTTP request. Time that waits on a database query does not count. The [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) page also says: "Each isolate has some built-in flexibility to allow for cases where your Worker infrequently runs over the configured limit." The model build is CPU work. In local workerd, it took 182 ms for 200 posts and 831 ms for 1,005 posts. Thus a call that builds the model uses more than 10 ms of CPU time at 200 posts and more. The first call in each isolate builds the model, and each change in the collection builds it again. `maxAge` does not remove these builds.
 - The cache keeps a model for each set of options that your pages use. It does not remove models.
 - The related entries come from the collection that you give. `getRelated()` does not compare entries across collections.
 - `filter` does not remove entries from the model. All entries of the collection change the weights of the terms.
@@ -323,11 +324,12 @@ const cards = related.map(({ id, data }) => ({
 
 ### EmDash options
 
-The options are the same as for `getRelated()`: `limit` (default `5`), `method` (default `"bm25"`), `fields`, `text`, and `filter`. `getEmDashRelated()` also has `locale`. The `GetEmDashRelatedOptions<D>` type describes them.
+The options are the same as for `getRelated()`: `limit` (default `5`), `method` (default `"bm25"`), `fields`, `text`, and `filter`. `getEmDashRelated()` also has `locale` and `maxAge`. The `GetEmDashRelatedOptions<D>` type describes them.
 
-| Option   | Type     | Default           | Description                                                                                  |
-| -------- | -------- | ----------------- | -------------------------------------------------------------------------------------------- |
-| `locale` | `string` | EmDash selects it | The locale of the entries to read. `getEmDashRelated()` gives it to `getEmDashCollection()`. |
+| Option   | Type     | Default           | Description                                                                                                                                                                  |
+| -------- | -------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `locale` | `string` | EmDash selects it | The locale of the entries to read. `getEmDashRelated()` gives it to `getEmDashCollection()`.                                                                                 |
+| `maxAge` | `number` | `0`               | The number of seconds to use the last full read of the collection again. With `0`, each call reads the collection. [Freshness window](#freshness-window) tells how it works. |
 
 The `text` function gets each published entry. It also gets the entry object that you give when its id is not in the published entries. Thus the type of its argument is `EmDashEntry<Partial<D>>`, and each key of `entry.data` can be `undefined`.
 
@@ -397,7 +399,33 @@ EmDash uses the slug of an entry as its id. Thus a preview of a published entry 
 
 EmDash sites render on request. `getEmDashRelated()` reads the collection on each call. It keeps one model for each locale until an entry changes. To find changes, it compares the id and the text of each entry. [Limitations](#limitations) tells how the cache works on Node.js servers and on Cloudflare Workers.
 
-For the measured time of a call with and without a cached model, read the [3.1.0 changelog](https://github.com/DBozhinovski/relatinator/blob/master/packages/astro-relatinator/CHANGELOG.md#310---2026-10-16).
+For the measured time of a call with and without a cached model, read the [3.1.0 changelog](https://github.com/DBozhinovski/relatinator/blob/master/packages/astro-relatinator/CHANGELOG.md#310---2026-10-16) and the [workerd measurement](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#workerd-measurement-of-getemdashrelated).
+
+#### Freshness window
+
+The change check reads all published entries and makes their text. It does this on each call, also when the model is in the cache. In local workerd with local D1 and 1,005 posts, a call with a cached model took 215 ms. The same page without the call took 12 ms.
+
+To skip the change check for some time, set `maxAge` to a number of seconds:
+
+```ts
+await getEmDashRelated("posts", post, { limit: 3, maxAge: 60 });
+```
+
+- If the last full read is less than `maxAge` seconds old, the call does not read the collection and does not make the text of the entries. It uses the entries and the model of that read. In the same measurement, this call took 2 ms.
+- After the window, the next call reads the collection and finds changes. Then a new window starts.
+- The last full read must be for the same collection, locale, `method`, and `fields` or `text`. Thus each locale has its own window.
+- A call without `maxAge` reads the collection. If a window exists for the same options, this read starts a new window.
+- A call in a preview or in edit mode does not use a window and does not keep its read. In emdash 1.3.1, these reads contain drafts. A window with such a read would show drafts on public pages.
+- An entry object that is not published, such as a draft, uses the model of the window and its own text.
+- `maxAge` must be a number from 0. Other values cause a `RangeError`. `Infinity` keeps the first read for the life of the process or isolate.
+
+The tradeoff is stale lists. Inside the window, the related lists do not show changes that are published after the read. A new entry is not in the lists. An unpublished or deleted entry can stay in the lists, and its link can go to a page that does not exist. A list can be `maxAge` seconds old.
+
+Each Node.js process and each Workers isolate keeps its own window and its own model. Thus two isolates can show different lists for the same entry, until the window of each isolate ends.
+
+The window uses `Date.now()`. In a Workers isolate, `Date.now()` does not change while code runs, but it changes between requests. Thus the window ends correctly between requests.
+
+With `text`, two functions with the same source code share one window. Inside the window, the call does not run your function for the published entries. If two pages use `text` functions with the same source code but different results, do not use `maxAge`, or make the source code different.
 
 ## EmDash topic suggestions
 

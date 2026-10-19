@@ -1,7 +1,12 @@
 import type { QueryOptions, RelatinatorModel } from "relatinator";
 import { emdashEntryText } from "./emdash-text.js";
 import { portableTextToPlainText } from "./portable-text.js";
-import { relatedIndex, type RelatedOptions } from "./related-index.js";
+import {
+  modelKey,
+  relatedIndex,
+  type RelatedIndex,
+  type RelatedOptions,
+} from "./related-index.js";
 
 export { emdashEntryText, portableTextToPlainText };
 
@@ -27,26 +32,24 @@ export interface GetEmDashRelatedOptions<
    * Default: EmDash selects the locale.
    */
   locale?: string;
+  /**
+   * Seconds to reuse the last full read of the collection, for the same
+   * locale, `method`, and text source. Inside this window, a call does
+   * not read the collection and does not find changes. Each process or
+   * isolate has its own window. Default: 0, which reads on each call.
+   */
+  maxAge?: number;
 }
 
 const PAGE_SIZE = 100;
 
-/** The published entries of a collection, and the locale of the query. */
-interface PublishedEntries<D extends object> {
-  readonly entries: EmDashEntry<D>[];
-  /** Tells an unset locale apart from each locale, also from "". */
-  readonly localeKey: string;
-}
+type GetEmDashCollection = typeof import("emdash").getEmDashCollection;
 
-async function getPublishedEntries<D extends object>(
+async function readPublished<D extends object>(
+  getEmDashCollection: GetEmDashCollection,
   collection: string,
   locale: string | undefined
-): Promise<PublishedEntries<D>> {
-  // Imported on call so that astro.config can import this package.
-  const { getEmDashCollection, getRequestContext } = await import("emdash");
-  // Without `locale`, EmDash queries the locale of the request context
-  // (emdash 1.3.1 `resolveLocale()` in `src/i18n/resolve.ts`).
-  const effective = locale ?? getRequestContext()?.locale;
+): Promise<EmDashEntry<D>[]> {
   const entries: EmDashEntry<D>[] = [];
   let cursor: string | undefined;
   do {
@@ -65,10 +68,74 @@ async function getPublishedEntries<D extends object>(
     entries.push(...(page.entries as EmDashEntry<D>[]));
     cursor = page.nextCursor;
   } while (cursor);
-  return {
-    entries,
-    localeKey: effective === undefined ? "" : `locale:${effective}`,
-  };
+  return entries;
+}
+
+/** A full read of a corpus, for `maxAge`. */
+interface RecentRead {
+  /** `Date.now()` when the read started. */
+  readonly at: number;
+  readonly index: RelatedIndex<EmDashEntry<object>>;
+}
+
+/** The last full read of each model key. */
+const recentReads = new Map<string, RecentRead>();
+
+/**
+ * The index of the published entries. Inside the `maxAge` window of the
+ * last full read of the same model key, it is the index of that read.
+ */
+async function publishedIndex<D extends object>(
+  collection: string,
+  options: GetEmDashRelatedOptions<D>,
+  textOf: (entry: EmDashEntry<Partial<D>>) => string
+): Promise<RelatedIndex<EmDashEntry<D>>> {
+  const { maxAge = 0 } = options;
+  if (typeof maxAge !== "number" || !(maxAge >= 0)) {
+    throw new RangeError(
+      `Invalid maxAge: ${maxAge}. Use a number of seconds from 0.`
+    );
+  }
+  // Imported on call so that astro.config can import this package.
+  const { getEmDashCollection, getRequestContext } = await import("emdash");
+  // Without `locale`, EmDash queries the locale of the request context
+  // (emdash 1.3.1 `resolveLocale()` in `src/i18n/resolve.ts`).
+  const context = getRequestContext();
+  const locale = options.locale ?? context?.locale;
+  // EmDash gives preview and edit-mode reads the drafts. A window must not
+  // keep a read with drafts for public requests.
+  const shared = !context?.preview && !context?.editMode;
+  // Tells an unset locale apart from each locale, also from "".
+  const localeKey = locale === undefined ? "" : `locale:${locale}`;
+  const corpusKey = `emdash\u0000${collection}\u0000${localeKey}`;
+  const key = modelKey(corpusKey, options);
+  const now = Date.now();
+  const recent = shared ? recentReads.get(key) : undefined;
+  if (recent && now - recent.at < maxAge * 1000) {
+    // The entries of one collection have the same shape for each `D`.
+    return recent.index as RelatedIndex<EmDashEntry<D>>;
+  }
+  const entries = await readPublished<D>(
+    getEmDashCollection,
+    collection,
+    options.locale
+  );
+  const index = relatedIndex<EmDashEntry<D>>(
+    {
+      key: corpusKey,
+      entries,
+      textOf,
+      // EmDash keeps `updatedAt` when only the terms or bylines of an
+      // entry change, so the version is the text.
+      versionOf: textOf,
+    },
+    options
+  );
+  // A call without a window keeps no entries, unless a window uses them.
+  if (shared && (maxAge > 0 || recent)) {
+    recentReads.set(key, { at: now, index });
+  }
+  return index;
 }
 
 /**
@@ -88,21 +155,7 @@ export async function getEmDashRelated<
   const { text, fields } = options;
   const textOf =
     text ?? ((e: EmDashEntry<Partial<D>>) => emdashEntryText(e, fields));
-  const { entries, localeKey } = await getPublishedEntries<D>(
-    collection,
-    options.locale
-  );
-  const index = relatedIndex<EmDashEntry<D>>(
-    {
-      key: `emdash\u0000${collection}\u0000${localeKey}`,
-      entries,
-      textOf,
-      // EmDash keeps `updatedAt` when only the terms or bylines of an
-      // entry change, so the version is the text.
-      versionOf: textOf,
-    },
-    options
-  );
+  const index = await publishedIndex(collection, options, textOf);
   return index.entries(
     rank(index.model, collection, entry, textOf, index.query(options))
   );

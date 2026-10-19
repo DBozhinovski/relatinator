@@ -13,5 +13,6 @@ declare module "emdash" {
     error?: Error;
     nextCursor?: string;
   }>;
-  export function getRequestContext(): { locale?: string } | undefined;
+  export function getRequestContext():
+    { locale?: string; editMode?: boolean; preview?: object } | undefined;
 }
