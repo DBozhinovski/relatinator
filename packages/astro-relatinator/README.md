@@ -219,6 +219,8 @@ Some data values change on each request, for example a stock count or a time. Th
 
 Astro 6 and 7 have live collections.
 
+`getLiveRelated()` does not give a filter to the loader. A loader that needs a filter returns an error, and `getLiveRelated()` throws it. The EmDash live loader is an example: it needs the collection type. For EmDash collections, use [`getEmDashRelated()`](#emdash).
+
 Astro documents live collections for pages that render on demand, with an adapter. In Astro 7.3.8, a prerendered page can also call `getLiveRelated()`. Then Astro runs the loader at build time. The page keeps the related list of the build.
 
 ## How it works
@@ -401,7 +403,7 @@ In emdash 1.3.1, the read of a preview contains the draft of the previewed entry
 - With emdash 1.0.0, the read of a preview contains no drafts. Thus a preview with changes gets the list of its own text.
 - In a request that is not a preview or edit mode, the object can have a different text than the model. Examples are an object that your page changes, and an entry that changed after the read of a freshness window.
 
-If your entry object has no `data.id`, the result can contain the published version of a draft with a new slug.
+Keep `data.id` in the entry object that you give. If your page makes its own object and leaves out `data.id`, the result can contain the published version of a draft with a new slug. In a preview of such a draft, that version is usually the first related entry.
 
 ### Caching on servers and Workers
 
