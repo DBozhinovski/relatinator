@@ -5,7 +5,7 @@ This Astro 7.3.8 site shows `astro-relatinator` with a content collection of six
 The playground is the manual check for changes that affect Astro. The `astro-relatinator` unit tests replace `astro:content` with a stub. The playground uses the real Astro content layer.
 
 - `src/content.config.ts` defines the `posts` collection with the `glob()` loader.
-- `src/pages/posts/[id].astro` calls `getRelated()` in a static page.
+- `src/pages/posts/[id].astro` calls `getRelated()` in a static page. It also calls `classify()` with the topics of `src/topics.ts` and the text of `entryText(post, ["title"])`, as in [Topics for your entries](../astro-relatinator/README.md#topics-for-your-entries).
 - `astro.config.mjs` adds the optional `relatinator()` integration.
 
 ## Run
@@ -43,3 +43,29 @@ done
 The command prints the `/posts/` links of each post page. On a post page, only the related list has `/posts/` links.
 
 A change to the tokenizer, the weights, the default text, or the posts can change the lists. If a list changes, find the cause before you update this table.
+
+## Expected topics
+
+On 2026-10-19, the build gave these topics:
+
+| Post                   | Topics, best first            |
+| ---------------------- | ----------------------------- |
+| `post-one`             | `life-sciences`               |
+| `science-books-autumn` | `life-sciences`               |
+| `science-books-space`  | `space`                       |
+| `science-books-spring` | `life-sciences`, `technology` |
+| `science-books-summer` | `life-sciences`, `technology` |
+| `tech-books-2023`      | `technology`                  |
+
+To print the topics after `pnpm build`, run this command in `packages/playground`:
+
+```sh
+for f in dist/posts/*/index.html; do
+  printf '%s: ' "$(basename "$(dirname "$f")")"
+  grep -oE '<ul id="topics"[^>]*>(<li[^>]*>[^<]*</li>)*' "$f" | grep -oE '<li[^>]*>[^<]+' | sed 's/<li[^>]*>//' | paste -sd ' ' -
+done
+```
+
+The command prints the items of the `topics` list of each post page.
+
+A change to the tokenizer, the weights, `classify()`, the default text, the topics, or the posts can change the topics. If a topic list changes, find the cause before you update this table.

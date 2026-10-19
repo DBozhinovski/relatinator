@@ -3,7 +3,7 @@ export interface ContentEntry {
   readonly id: string;
   readonly data: object;
   readonly body?: string;
-  readonly digest?: string;
+  readonly digest?: string | number;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -37,12 +37,13 @@ function collectText(
 }
 
 /**
- * Default text for an entry: the string and number values of its data
- * (restricted to `fields` when given), followed by its body.
+ * The string and number values of the data of an entry (restricted to
+ * `fields` when given), followed by its body. `valueText` reads the
+ * values that need special handling.
  */
-export function entryText(
+export function entryTextWith(
   entry: ContentEntry,
-  fields?: readonly string[],
+  fields: readonly string[] | undefined,
   valueText?: ValueText
 ): string {
   const data = isPlainObject(entry.data) ? entry.data : {};
@@ -50,4 +51,15 @@ export function entryText(
   const parts = collectText(values, [], valueText);
   if (entry.body) parts.push(entry.body);
   return parts.join(" ");
+}
+
+/**
+ * The default text of an Astro entry, which `getRelated()` reads without
+ * `text`. `entryTextWith()` gives the rules.
+ */
+export function entryText(
+  entry: ContentEntry,
+  fields?: readonly string[]
+): string {
+  return entryTextWith(entry, fields);
 }

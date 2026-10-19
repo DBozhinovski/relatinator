@@ -1,4 +1,4 @@
-import { entryText, type ContentEntry } from "./entry-text.js";
+import { entryTextWith, type ContentEntry } from "./entry-text.js";
 import { portableTextValue } from "./portable-text.js";
 
 // Values that EmDash adds to `entry.data` next to the content fields
@@ -51,7 +51,8 @@ function contentData(data: object): Record<string, unknown> {
 }
 
 /**
- * Default text for an EmDash entry. Portable Text becomes plain text.
+ * The default text of an EmDash entry, which `getEmDashRelated()` reads
+ * without `text`. Portable Text becomes plain text.
  * Without `fields`, it reads the content fields and the labels of the
  * taxonomy terms, but not the values that EmDash adds to every entry.
  */
@@ -60,5 +61,5 @@ export function emdashEntryText(
   fields?: readonly string[]
 ): string {
   const data = fields ? entry.data : contentData(entry.data);
-  return entryText({ id: entry.id, data }, fields, portableTextValue);
+  return entryTextWith({ id: entry.id, data }, fields, portableTextValue);
 }

@@ -110,6 +110,72 @@ await getRelated("posts", post, {
 
 `filter` changes only the results. The model contains all entries of the collection, so the scores do not change. Because `filter` applies before `limit`, the result has `limit` entries when enough entries match.
 
+## Topics for your entries
+
+`classify()` from [`relatinator`](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#classifytopics-text-options) chooses topics for a text from a fixed list. To get topics for an entry, give it the text of the entry. `entryText(entry, fields?)` returns the default text of an entry. This is the text that `getRelated()` reads when you do not set `text`.
+
+`classify()` is in `relatinator` 3.2 or later. Install `relatinator` next to `astro-relatinator`:
+
+```sh
+npm install relatinator
+```
+
+Write your topic list in a module:
+
+```ts
+// src/topics.ts
+import type { Topic } from "relatinator";
+
+export const topics: Topic[] = [
+  {
+    tag: "astronomy",
+    description:
+      "black holes, galaxies, comets, planets, telescopes, the James Webb Space Telescope, and the night sky",
+  },
+  {
+    tag: "baking",
+    description:
+      "sourdough starters, bread, flour, yeast, ovens, pastry, cakes, and recipes for the home kitchen",
+  },
+];
+```
+
+Call `classify()` in the frontmatter of a page, and show the topics:
+
+```astro
+---
+// src/pages/posts/[id].astro
+import { getCollection } from "astro:content";
+import { entryText } from "astro-relatinator";
+import { classify } from "relatinator";
+import { topics } from "../../topics";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts");
+  return posts.map((post) => ({ params: { id: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+// Read the title and the description, plus the body. Do not read `tags`.
+const postTopics = classify(topics, entryText(post, ["title", "description"]));
+---
+
+<h1>{post.data.title}</h1>
+<ul>
+  {postTopics.map(({ tag }) => <li>{tag}</li>)}
+</ul>
+```
+
+`classify()` returns at most 3 topics, best first. If no topic shares a term with the text, it returns `[]`.
+
+Do not read the field that has the existing tags of the entry. Without `fields`, `entryText()` reads all of the fields in `entry.data`, including `tags`. Each tag in the text matches the topic with the same tag. Thus that topic gets a higher score, and the result shows the existing tags again. The other topics can then be missing from the 3 results. For this reason, the example sets `fields` to the fields other than `tags`. `entryText()` always reads the body.
+
+`classify()` does not read the collection, and it does not use the model cache of `getRelated()`. It compares the text with the topic list only.
+
+The topic list controls most of the result. To write it, read [Best practices for topic lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#best-practices-for-topic-lists).
+
+For EmDash entries, `emdashEntryText(entry, fields?)` from `astro-relatinator/emdash` returns the default EmDash text. Without `fields`, this text contains the labels of the taxonomy terms of the entry. For term suggestions in the entry editor, read [EmDash topic suggestions](#emdash-topic-suggestions).
+
 ## How it works
 
 `getRelated()` reads the collection with `getCollection()` each time that a page calls it. It does not read files when Astro starts, and it does not watch files.
@@ -254,6 +320,8 @@ await getEmDashRelated("posts", post, {
   fields: ["title", "excerpt", "content"],
 });
 ```
+
+`emdashEntryText(entry, fields?)` from `astro-relatinator/emdash` returns this default text.
 
 To convert Portable Text in your own `text` function, use `portableTextToPlainText()`:
 

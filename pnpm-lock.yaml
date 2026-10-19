@@ -51,6 +51,9 @@ importers:
       astro-relatinator:
         specifier: workspace:^
         version: link:../astro-relatinator
+      relatinator:
+        specifier: workspace:^
+        version: link:../relatinator
     devDependencies:
       '@astrojs/check':
         specifier: 0.9.10

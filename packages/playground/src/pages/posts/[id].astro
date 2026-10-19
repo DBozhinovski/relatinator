@@ -1,8 +1,10 @@
 ---
 import type { GetStaticPaths } from "astro";
 import { getCollection, render } from "astro:content";
-import { getRelated } from "astro-relatinator";
+import { entryText, getRelated } from "astro-relatinator";
+import { classify } from "relatinator";
 import Layout from "../../layouts/Layout.astro";
+import { topics } from "../../topics";
 
 export const getStaticPaths = (async () => {
 	const posts = await getCollection("posts");
@@ -12,6 +14,8 @@ export const getStaticPaths = (async () => {
 const { post } = Astro.props;
 const { Content } = await render(post);
 const related = await getRelated("posts", post, { limit: 3 });
+// Not `tags` or `categories`: they would repeat the existing topics.
+const postTopics = classify(topics, entryText(post, ["title"]));
 ---
 
 <Layout title={post.data.title}>
@@ -21,6 +25,10 @@ const related = await getRelated("posts", post, { limit: 3 });
 		<p>By {post.data.author}</p>
 		<Content />
 	</article>
+	<p>Topics:</p>
+	<ul id="topics">
+		{postTopics.map(({ tag }) => <li>{tag}</li>)}
+	</ul>
 	<aside>
 		<h2>Related</h2>
 		<ul id="related">

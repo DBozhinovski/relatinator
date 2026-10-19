@@ -3,7 +3,7 @@ import { emdashEntryText } from "./emdash-text.js";
 import { portableTextToPlainText } from "./portable-text.js";
 import { relatedIndex, type RelatedOptions } from "./related-index.js";
 
-export { portableTextToPlainText };
+export { emdashEntryText, portableTextToPlainText };
 
 /**
  * An EmDash entry. `D` is the type of `data` in the published entries

@@ -24,7 +24,7 @@ export async function getRelated<C extends CollectionKey>(
       key: String(collection),
       entries,
       textOf,
-      versionOf: (e) => (!text && e.digest ? e.digest : textOf(e)),
+      versionOf: (e) => (!text && e.digest ? String(e.digest) : textOf(e)),
     },
     options
   );
