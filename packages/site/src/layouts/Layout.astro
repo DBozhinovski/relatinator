@@ -1,0 +1,117 @@
+---
+import Header from "../components/Header.astro";
+import Font from "astro/components/Font.astro";
+import "../styles/global.css";
+import { getCollection, render } from "astro:content";
+interface Props {
+  title: string;
+  active: "docs" | "demo" | null;
+  description?: string;
+}
+const {
+  title,
+  active,
+  description = "relatinator finds related posts with BM25 or TF-IDF. astro-relatinator does it for Astro content collections at build time.",
+} = Astro.props;
+const docEntries = await getCollection("docs");
+const sectionEntries = (
+  await Promise.all(
+    docEntries.map(async (entry) => {
+      const { headings } = await render(entry);
+      return headings
+        .filter((heading) => heading.depth === 2)
+        .map((heading) => ({
+          label: heading.text,
+          group: entry.id === "architecture" ? "Architecture" : entry.id,
+          href: `/docs/${entry.id}/#${heading.slug}`,
+        }));
+    }),
+  )
+).flat();
+const entries = [
+  { label: "Home", group: "Page", href: "/" },
+  { label: "relatinator", group: "Page", href: "/docs/relatinator/" },
+  {
+    label: "astro-relatinator",
+    group: "Page",
+    href: "/docs/astro-relatinator/",
+  },
+  { label: "Architecture", group: "Page", href: "/docs/architecture/" },
+  { label: "Demo", group: "Page", href: "/demo/" },
+  {
+    label: "GitHub",
+    group: "Link",
+    href: "https://github.com/DBozhinovski/relatinator",
+  },
+  {
+    label: "relatinator on npm",
+    group: "Link",
+    href: "https://www.npmjs.com/package/relatinator",
+  },
+  {
+    label: "astro-relatinator on npm",
+    group: "Link",
+    href: "https://www.npmjs.com/package/astro-relatinator",
+  },
+  ...sectionEntries,
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="https://relatinator.com/og.png" />
+    <meta
+      property="og:url"
+      content={`https://relatinator.com${Astro.url.pathname}`}
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script is:inline>
+      try {
+        const theme = localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark")
+          document.documentElement.setAttribute("data-theme", theme);
+      } catch {}
+    </script>
+    <Font cssVariable="--font-display" preload />
+    <Font cssVariable="--font-body" preload />
+    <Font cssVariable="--font-mono" preload />
+    <title>{title}</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">
+      Skip to content
+    </a>
+    <Header active={active} entries={entries} />
+    <main id="main">
+      <slot />
+    </main>
+    <footer>
+      <div class="footer-inner">
+        <svg class="footer-symbol" viewBox="0 0 64 64" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M8 8H40V20H20V40H8Z M44 24H56V56H24V44H44Z"
+          />
+          <path fill="var(--color-accent)" d="M24 24H40V40H24Z" />
+        </svg>
+        <span>MIT license</span>
+        <a href="https://github.com/DBozhinovski/relatinator">GitHub</a>
+        <a href="https://www.npmjs.com/package/relatinator">
+          relatinator on npm
+        </a>
+        <a href="https://www.npmjs.com/package/astro-relatinator">
+          astro-relatinator on npm
+        </a>
+      </div>
+    </footer>
+  </body>
+</html>

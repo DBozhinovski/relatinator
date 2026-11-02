@@ -1,0 +1,713 @@
+[
+  {
+    "file": "designs/logo/final/a-lockup-reversed.svg",
+    "bytes": 4604,
+    "viewBox": [
+      0.0,
+      0.0,
+      507.0,
+      72.0
+    ],
+    "aspect": 7.042,
+    "aspect_class": "extra-wide",
+    "colors": [
+      "#eff2f6",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      8.0,
+      5.44,
+      497.65,
+      63.12
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 9.4,
+      "top": 5.4,
+      "bottom": 8.9
+    },
+    "bbox_fill_ratio": 0.774,
+    "score": 98,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      },
+      {
+        "level": "INFO",
+        "code": "extra-wide",
+        "message": "Extra-wide lockup (>4.5:1) shrinks badly; provide a stacked lockup and a standalone symbol."
+      }
+    ]
+  },
+  {
+    "file": "designs/logo/final/a-lockup-stacked-reversed.svg",
+    "bytes": 4626,
+    "viewBox": [
+      0.0,
+      0.0,
+      432.0,
+      288.0
+    ],
+    "aspect": 1.5,
+    "aspect_class": "wide",
+    "colors": [
+      "#eff2f6",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      7.85,
+      32.0,
+      417.65,
+      261.12
+    ],
+    "margins": {
+      "left": 7.8,
+      "right": 14.4,
+      "top": 32.0,
+      "bottom": 26.9
+    },
+    "bbox_fill_ratio": 0.755,
+    "score": 99,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      }
+    ]
+  },
+  {
+    "file": "designs/logo/final/a-lockup-stacked.svg",
+    "bytes": 4617,
+    "viewBox": [
+      0.0,
+      0.0,
+      432.0,
+      288.0
+    ],
+    "aspect": 1.5,
+    "aspect_class": "wide",
+    "colors": [
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      7.85,
+      32.0,
+      417.65,
+      261.12
+    ],
+    "margins": {
+      "left": 7.8,
+      "right": 14.4,
+      "top": 32.0,
+      "bottom": 26.9
+    },
+    "bbox_fill_ratio": 0.755,
+    "score": 99,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      }
+    ]
+  },
+  {
+    "file": "designs/logo/final/a-lockup.svg",
+    "bytes": 4595,
+    "viewBox": [
+      0.0,
+      0.0,
+      507.0,
+      72.0
+    ],
+    "aspect": 7.042,
+    "aspect_class": "extra-wide",
+    "colors": [
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      8.0,
+      5.44,
+      497.65,
+      63.12
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 9.4,
+      "top": 5.4,
+      "bottom": 8.9
+    },
+    "bbox_fill_ratio": 0.774,
+    "score": 98,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      },
+      {
+        "level": "INFO",
+        "code": "extra-wide",
+        "message": "Extra-wide lockup (>4.5:1) shrinks badly; provide a stacked lockup and a standalone symbol."
+      }
+    ]
+  },
+  {
+    "file": "designs/logo/final/a-symbol-mono.svg",
+    "bytes": 348,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#000000"
+    ],
+    "gradients": 0,
+    "anchors": 19,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      8.0,
+      8.0,
+      56.0,
+      56.0
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 8.0,
+      "top": 8.0,
+      "bottom": 8.0
+    },
+    "bbox_fill_ratio": 0.562,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "designs/logo/final/a-symbol-reversed.svg",
+    "bytes": 337,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#eff2f6",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 19,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      8.0,
+      8.0,
+      56.0,
+      56.0
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 8.0,
+      "top": 8.0,
+      "bottom": 8.0
+    },
+    "bbox_fill_ratio": 0.562,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "designs/logo/final/a-symbol.svg",
+    "bytes": 328,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 19,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      8.0,
+      8.0,
+      56.0,
+      56.0
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 8.0,
+      "top": 8.0,
+      "bottom": 8.0
+    },
+    "bbox_fill_ratio": 0.562,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "designs/logo/final/apple-touch-icon.svg",
+    "bytes": 419,
+    "viewBox": [
+      0.0,
+      0.0,
+      180.0,
+      180.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#f8fafd",
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 24,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      0.0,
+      0.0,
+      180.0,
+      180.0
+    ],
+    "margins": {
+      "left": 0.0,
+      "right": 0.0,
+      "top": 0.0,
+      "bottom": 0.0
+    },
+    "bbox_fill_ratio": 1.0,
+    "score": 92,
+    "findings": [
+      {
+        "level": "WARN",
+        "code": "low-contrast",
+        "message": "Low contrast on #f8fafd: #f8fafd (1.0:1) \u2014 aim for \u22653:1 for logo parts, 4.5:1 for small text."
+      }
+    ]
+  },
+  {
+    "file": "designs/logo/final/og.svg",
+    "bytes": 20925,
+    "viewBox": [
+      0.0,
+      0.0,
+      1200.0,
+      630.0
+    ],
+    "aspect": 1.905,
+    "aspect_class": "wide",
+    "colors": [
+      "#f8fafd",
+      "#dadee3",
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 1039,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      0.0,
+      0.0,
+      1200.0,
+      630.0
+    ],
+    "margins": {
+      "left": 0.0,
+      "right": 0.0,
+      "top": 0.0,
+      "bottom": 0.0
+    },
+    "bbox_fill_ratio": 1.0,
+    "score": 75,
+    "findings": [
+      {
+        "level": "WARN",
+        "code": "low-contrast",
+        "message": "Low contrast on #f8fafd: #f8fafd (1.0:1), #dadee3 (1.3:1) \u2014 aim for \u22653:1 for logo parts, 4.5:1 for small text."
+      },
+      {
+        "level": "INFO",
+        "code": "strokes",
+        "message": "1 element(s) with strokes. Expand strokes to filled outlines in the master so the mark scales and cuts predictably (or document that it is a stroke-based variant)."
+      },
+      {
+        "level": "WARN",
+        "code": "complex",
+        "message": "1039 anchor points \u2014 more than 95% of comparable reference logos (median 75.0). Simplify: fewer points, merged shapes, less detail."
+      },
+      {
+        "level": "WARN",
+        "code": "tiny-detail",
+        "message": "36 sub-shape(s) smaller than 1/32 of the lockup height (\u22481 px at 32 px tall): 3.3\u00d715.8 at (124,362); 4.5\u00d74.5 at (123,356); 14.9\u00d716.0 at (132,362); 9.8\u00d710.9 at (154,365) \u2026. They vanish when small \u2014 enlarge, merge or remove them, or provide a small-size version."
+      }
+    ]
+  },
+  {
+    "file": "designs/logo/final/sheet.svg",
+    "bytes": 44368,
+    "viewBox": [
+      0.0,
+      0.0,
+      1440.0,
+      1380.0
+    ],
+    "aspect": 1.043,
+    "aspect_class": "square",
+    "colors": [
+      "#f8fafd",
+      "#192029",
+      "#0a6ddd",
+      "#161b22",
+      "#eff2f6",
+      "#dadee3"
+    ],
+    "gradients": 0,
+    "anchors": 2226,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      0.0,
+      0.0,
+      1440.0,
+      1380.0
+    ],
+    "margins": {
+      "left": 0.0,
+      "right": 0.0,
+      "top": 0.0,
+      "bottom": 0.0
+    },
+    "bbox_fill_ratio": 1.0,
+    "score": 40,
+    "findings": [
+      {
+        "level": "FAIL",
+        "code": "live-text",
+        "message": "Contains <text>: final logos must use outlined paths (fonts differ per machine)."
+      },
+      {
+        "level": "INFO",
+        "code": "style-block",
+        "message": "Uses a <style> block; inline fill attributes are more portable across tools."
+      },
+      {
+        "level": "INFO",
+        "code": "precision",
+        "message": "Coordinates with 4+ decimals: round to 0\u20132 decimals to reduce size and reveal misalignments."
+      },
+      {
+        "level": "WARN",
+        "code": "many-colors",
+        "message": "6 distinct colours. ~75% of reference logos use \u22643; each extra colour costs recall and reproduction."
+      },
+      {
+        "level": "WARN",
+        "code": "low-contrast",
+        "message": "Low contrast on #f8fafd: #f8fafd (1.0:1), #eff2f6 (1.1:1), #dadee3 (1.3:1) \u2014 aim for \u22653:1 for logo parts, 4.5:1 for small text."
+      },
+      {
+        "level": "INFO",
+        "code": "strokes",
+        "message": "1 element(s) with strokes. Expand strokes to filled outlines in the master so the mark scales and cuts predictably (or document that it is a stroke-based variant)."
+      },
+      {
+        "level": "WARN",
+        "code": "complex",
+        "message": "2226 anchor points \u2014 more than 95% of comparable reference logos (median 53.0). Simplify: fewer points, merged shapes, less detail."
+      },
+      {
+        "level": "WARN",
+        "code": "tiny-detail",
+        "message": "81 sub-shape(s) smaller than 1/48 of the canvas (\u22481 px at 48 px): 16.0\u00d716.0 at (24,26); 20.2\u00d78.6 at (127,29); 17.5\u00d710.5 at (194,45); 12.1\u00d712.0 at (269,5) \u2026. They vanish when small \u2014 enlarge, merge or remove them, or provide a small-size version."
+      }
+    ]
+  },
+  {
+    "file": "packages/site/public/favicon.svg",
+    "bytes": 413,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 19,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      2.0,
+      2.0,
+      62.0,
+      62.0
+    ],
+    "margins": {
+      "left": 2.0,
+      "right": 2.0,
+      "top": 2.0,
+      "bottom": 2.0
+    },
+    "bbox_fill_ratio": 0.879,
+    "score": 99,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "style-block",
+        "message": "Uses a <style> block; inline fill attributes are more portable across tools."
+      }
+    ]
+  },
+  {
+    "file": "packages/site/public/logo.svg",
+    "bytes": 4595,
+    "viewBox": [
+      0.0,
+      0.0,
+      507.0,
+      72.0
+    ],
+    "aspect": 7.042,
+    "aspect_class": "extra-wide",
+    "colors": [
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      8.0,
+      5.44,
+      497.65,
+      63.12
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 9.4,
+      "top": 5.4,
+      "bottom": 8.9
+    },
+    "bbox_fill_ratio": 0.774,
+    "score": 98,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      },
+      {
+        "level": "INFO",
+        "code": "extra-wide",
+        "message": "Extra-wide lockup (>4.5:1) shrinks badly; provide a stacked lockup and a standalone symbol."
+      }
+    ]
+  },
+  {
+    "file": "packages/site/public/logo-stacked.svg",
+    "bytes": 4617,
+    "viewBox": [
+      0.0,
+      0.0,
+      432.0,
+      288.0
+    ],
+    "aspect": 1.5,
+    "aspect_class": "wide",
+    "colors": [
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      7.85,
+      32.0,
+      417.65,
+      261.12
+    ],
+    "margins": {
+      "left": 7.8,
+      "right": 14.4,
+      "top": 32.0,
+      "bottom": 26.9
+    },
+    "bbox_fill_ratio": 0.755,
+    "score": 99,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      }
+    ]
+  },
+  {
+    "file": "logo.svg",
+    "bytes": 4617,
+    "viewBox": [
+      0.0,
+      0.0,
+      432.0,
+      288.0
+    ],
+    "aspect": 1.5,
+    "aspect_class": "wide",
+    "colors": [
+      "#192029",
+      "#0a6ddd"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      7.85,
+      32.0,
+      417.65,
+      261.12
+    ],
+    "margins": {
+      "left": 7.8,
+      "right": 14.4,
+      "top": 32.0,
+      "bottom": 26.9
+    },
+    "bbox_fill_ratio": 0.755,
+    "score": 99,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      }
+    ]
+  }
+]

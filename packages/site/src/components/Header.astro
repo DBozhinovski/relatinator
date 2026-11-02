@@ -1,0 +1,232 @@
+---
+interface Props {
+  active: "docs" | "demo" | null;
+  entries: Array<{ label: string; group: string; href: string }>;
+}
+const { active, entries } = Astro.props;
+const isRoot = active === null;
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a
+      class="brand"
+      href="/"
+      aria-label="relatinator home"
+      aria-current={isRoot ? "page" : undefined}
+    >
+      <svg class="brand-symbol" viewBox="0 0 64 64" aria-hidden="true">
+        <path
+          fill="currentColor"
+          d="M8 8H40V20H20V40H8Z M44 24H56V56H24V44H44Z"
+        />
+        <path fill="var(--color-accent)" d="M24 24H40V40H24Z" />
+      </svg>
+      <span class="wordmark">relatinator</span>
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a
+        href="/docs/relatinator/"
+        aria-current={active === "docs" ? "page" : undefined}
+      >
+        Docs
+      </a>
+      <a href="/demo/" aria-current={active === "demo" ? "page" : undefined}>
+        Demo
+      </a>
+      <a href="https://github.com/DBozhinovski/relatinator">GitHub</a>
+    </nav>
+    <div class="header-tools">
+      <button
+        class="search-trigger"
+        id="search-trigger"
+        type="button"
+        aria-label="Search"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="10.8" cy="10.8" r="6.8" />
+          <path d="m16 16 5 5" />
+        </svg>
+        <span class="search-label">Search</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <button
+        class="theme-toggle"
+        id="theme-toggle"
+        type="button"
+        aria-label="Toggle dark mode"
+        aria-pressed="false"
+      >
+        <svg
+          class="theme-sun"
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+        >
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+        </svg>
+        <svg
+          class="theme-moon"
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.7"
+        >
+          <path d="M20.5 15.2A8.6 8.6 0 0 1 8.8 3.5 8.7 8.7 0 1 0 20.5 15.2Z" />
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+<dialog
+  class="palette"
+  id="command-palette"
+  aria-label="Search pages and sections"
+>
+  <form class="palette-form" method="dialog">
+    <label class="sr-only" for="palette-search">
+      Search pages and sections
+    </label>
+    <input
+      class="palette-input"
+      id="palette-search"
+      type="search"
+      placeholder="Search pages and sections"
+      autocomplete="off"
+    />
+  </form>
+  <ul
+    class="palette-list"
+    id="palette-list"
+    role="listbox"
+    aria-label="Search results"
+  >
+    {entries.map((entry, index) => (
+      <li
+        class="palette-option"
+        role="option"
+        aria-selected={index === 0 ? "true" : "false"}
+        tabindex="-1"
+        data-href={entry.href}
+      >
+        <span>{entry.label}</span>
+        <small>{entry.group}</small>
+      </li>
+    ))}
+  </ul>
+  <p class="palette-empty" id="palette-empty" role="status" hidden>
+    No pages or sections match.
+  </p>
+  <script>
+    const dialog =
+      document.querySelector<HTMLDialogElement>("#command-palette");
+    const search = document.querySelector<HTMLInputElement>("#palette-search");
+    const list = document.querySelector<HTMLElement>("#palette-list");
+    const trigger =
+      document.querySelector<HTMLButtonElement>("#search-trigger");
+    const options = () =>
+      Array.from(list?.querySelectorAll<HTMLElement>("[role=option]") ?? []);
+    let opener: HTMLElement | null = null;
+    let selected = 0;
+    const close = () => {
+      if (!dialog?.open) return;
+      dialog.close();
+      opener?.focus();
+    };
+    const open = (control: HTMLElement) => {
+      if (!dialog || dialog.open) return;
+      opener = control;
+      dialog.showModal();
+      if (search) {
+        search.value = "";
+        filter();
+        search.focus();
+      }
+    };
+    const filter = () => {
+      const query = search?.value.trim().toLocaleLowerCase() ?? "";
+      let visible = 0;
+      for (const option of options()) {
+        const match =
+          option.textContent?.toLocaleLowerCase().includes(query) ?? false;
+        option.hidden = !match;
+        if (match) {
+          option.setAttribute(
+            "aria-selected",
+            visible === 0 ? "true" : "false",
+          );
+          visible += 1;
+        }
+      }
+      const empty = document.querySelector<HTMLElement>("#palette-empty");
+      if (empty) empty.hidden = visible > 0;
+      selected = 0;
+    };
+    trigger?.addEventListener("click", () => open(trigger));
+    search?.addEventListener("input", filter);
+    document.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        const active = document.activeElement;
+        open(
+          active instanceof HTMLElement && active !== document.body
+            ? active
+            : trigger!,
+        );
+      }
+      if (!dialog?.open) return;
+      const shown = options().filter((option) => !option.hidden);
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        selected =
+          (selected + (event.key === "ArrowDown" ? 1 : -1) + shown.length) %
+          shown.length;
+        shown.forEach((row, index) =>
+          row.setAttribute(
+            "aria-selected",
+            index === selected ? "true" : "false",
+          ),
+        );
+      }
+      if (event.key === "Enter" && shown[selected]) {
+        event.preventDefault();
+        const href = shown[selected].dataset.href;
+        if (href) location.href = href;
+      }
+    });
+    dialog?.addEventListener("click", (event) => {
+      if (event.target === dialog) close();
+      const row = (event.target as Element).closest<HTMLElement>(
+        "[role=option]",
+      );
+      if (row?.dataset.href) location.href = row.dataset.href;
+    });
+    dialog?.addEventListener("close", () => opener?.focus());
+    const toggle = document.querySelector<HTMLButtonElement>("#theme-toggle");
+    const isDark = () =>
+      document.documentElement.dataset.theme === "dark" ||
+      (!document.documentElement.dataset.theme &&
+        matchMedia("(prefers-color-scheme: dark)").matches);
+    const syncThemeButton = () =>
+      toggle?.setAttribute("aria-pressed", isDark() ? "true" : "false");
+    syncThemeButton();
+    toggle?.addEventListener("click", () => {
+      const next = isDark() ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      localStorage.setItem("theme", next);
+      syncThemeButton();
+    });
+  </script>
+</dialog>

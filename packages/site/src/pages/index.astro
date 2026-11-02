@@ -1,0 +1,311 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { Code } from "astro:components";
+import { getCollection } from "astro:content";
+import { graphiteTheme } from "../lib/shiki-theme";
+import { prepareLandingData } from "../lib/landing";
+const { posts, initialId, firstResult, explanation, termRows } =
+  prepareLandingData(await getCollection("demoPosts"));
+const features = [
+  {
+    title: "Works with Astro content collections",
+    body: 'getRelated("posts", entry, { limit: 3 }) reads the collection when the page renders. It works with static output and with on-demand rendering.',
+    code: 'const related = await getRelated("posts", entry,\n  { limit: 3 });\nreturn related;',
+  },
+  {
+    title: "Topics from a fixed list",
+    body: "classify(topics, text) matches text against topic descriptions you write. You don't train anything or ship a model file, and the text never leaves your process.",
+    code: 'const topics = [{ tag: "space", description }];\nconst best = classify(topics, text);',
+  },
+];
+const steps = [
+  {
+    name: "Tokenize",
+    body: "Lowercases the text, removes elisions, splits on anything that isn't a letter or digit, drops stopwords, and stems what's left with Porter2.",
+  },
+  {
+    name: "Weigh",
+    body: "Indexes the documents once and weights each term with BM25 or TF-IDF.",
+  },
+  {
+    name: "Score",
+    body: "Adds up the weights of the query terms that a document contains.",
+  },
+  {
+    name: "Rank",
+    body: "Drops the query document, excluded documents, and anything that scored zero. Sorts the rest by score, keeps input order for ties, and returns as many ids as you asked for with limit.",
+  },
+];
+---
+
+<Layout title="Relatinator · find related posts" active={null}>
+  <section class="hero reveal" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <p class="release-chip">relatinator 3.3 · MIT</p>
+      <h1 id="hero-title">Find related posts when your site builds.</h1>
+      <p class="lead">
+        relatinator scores your documents against each other with BM25 or
+        TF-IDF. It runs in Node.js, the browser, and Cloudflare Workers, and its
+        only dependency is a stemmer. astro-relatinator hooks it into Astro
+        content collections, so a related posts list is one getRelated call.
+      </p>
+      <div class="install-card">
+        <div class="install-lines">
+          <code>pnpm add relatinator</code>
+          <code>pnpm add astro-relatinator</code>
+        </div>
+        <button class="small-button" id="copy-install" type="button">
+          Copy
+        </button>
+      </div>
+      <div class="actions">
+        <a class="btn-primary" href="/docs/relatinator/">
+          Read the docs
+        </a>
+        <a class="btn-secondary" href="/demo/">
+          Try the demo →
+        </a>
+      </div>
+    </div>
+    <section class="code-card live-card" aria-label="Related post results">
+      <div class="code-head">
+        <code>related.ts</code>
+        <label for="hero-post">Post</label>
+        <select id="hero-post" aria-label="Post">
+          {posts.map((post) => (
+            <option
+              value={post.id}
+              title={post.title}
+              selected={post.id === initialId}
+            >
+              {post.title.length > 18 ? `${post.title.slice(0, 18)}…` : post.title}
+            </option>
+          ))}
+        </select>
+        <span class="status-chip" id="hero-status" aria-live="polite">
+          BUILD TIME
+        </span>
+      </div>
+      <div id="hero-code">
+        <Code
+          lang="ts"
+          theme={graphiteTheme}
+          code={`import { createModel } from "relatinator";\n\nconst model = createModel(posts);\nmodel.findRelatedScored("${initialId}", { limit: 3 });`}
+        />
+      </div>
+      <ol
+        class="live-results"
+        id="hero-results"
+        aria-label="Top related posts"
+        data-posts={JSON.stringify(posts)}
+      >
+        {firstResult.map((row, index) => (
+          <li
+            class:list={["live-result", { top: index === 0 }]}
+            data-post-id={row.id}
+          >
+            <span class="live-rank">0{index + 1}</span>
+            <span class="live-title">{row.label}</span>
+            <span class="live-score">{row.score}</span>
+            <span class="term-chips">
+              {row.terms.map((term) => (
+                <code>{term}</code>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  </section>
+  <section class="features reveal" aria-label="What you get">
+    <article class="feature-main">
+      <h2>See why a post ranked where it did</h2>
+      <p>
+        findRelatedScored gives you the scores. explainRelated shows which words
+        earned them, so you can check a strange match instead of guessing.
+      </p>
+      <div class="code-card feature-code">
+        <div class="code-head">
+          <code>explain.ts</code>
+        </div>
+        <Code
+          lang="ts"
+          theme={graphiteTheme}
+          code={
+            'model.explainRelated("science-books-space", "science-books-autumn");'
+          }
+        />
+        <div class="live-results">
+          <ul class="term-chips">
+            {termRows(explanation)
+              .slice(0, 6)
+              .map((term) => (
+                <li>
+                  <code>
+                    {term.term} · {Number(term.score).toFixed(2)}
+                  </code>
+                </li>
+              ))}
+          </ul>
+        </div>
+      </div>
+    </article>
+    <div class="feature-side">
+      {features.map((feature) => (
+        <article>
+          <h2>{feature.title}</h2>
+          <p>{feature.body}</p>
+          <div class="code-card feature-code">
+            <Code lang="ts" theme={graphiteTheme} code={feature.code} />
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+  <section class="band reveal" aria-labelledby="how-scoring-works">
+    <div class="container">
+      <h2 id="how-scoring-works">How scoring works</h2>
+      <ol class="steps">
+        {steps.map((step, index) => (
+          <li>
+            <span class="step-name">
+              0{index + 1} · {step.name}
+            </span>
+            <p>{step.body}</p>
+          </li>
+        ))}
+      </ol>
+      <a href="/docs/relatinator/#how-scoring-works">Read the full rules →</a>
+    </div>
+  </section>
+  <section class="compatibility reveal" aria-labelledby="compatibility">
+    <h2 id="compatibility">Compatibility</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Target</th>
+            <th>relatinator</th>
+            <th>astro-relatinator</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Node.js</td>
+            <td>22.12 or later</td>
+            <td>22.12 or later</td>
+          </tr>
+          <tr>
+            <td>Browsers</td>
+            <td>Yes</td>
+            <td>No, it runs at build time or on the server</td>
+          </tr>
+          <tr>
+            <td>Cloudflare</td>
+            <td>Workers</td>
+            <td>The Cloudflare adapter, with prerendering in workerd</td>
+          </tr>
+          <tr>
+            <td>Astro</td>
+            <td>Not needed</td>
+            <td>6 and 7</td>
+          </tr>
+          <tr>
+            <td>Astro output</td>
+            <td>Not needed</td>
+            <td>Static output and on-demand rendering</td>
+          </tr>
+          <tr>
+            <td>EmDash</td>
+            <td>Not needed</td>
+            <td>1.x (1.0 or later), as an optional peer dependency</td>
+          </tr>
+          <tr>
+            <td>Module format</td>
+            <td>ES modules only, with type files</td>
+            <td>ES modules only, with type files</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <script>
+    import { createModel } from "relatinator";
+    const resultList =
+      document.querySelector<HTMLOListElement>("#hero-results");
+    const postSelect = document.querySelector<HTMLSelectElement>("#hero-post");
+    const heroCode = document.querySelector<HTMLElement>("#hero-code");
+    const postCodeId = Array.from(
+      heroCode?.querySelectorAll("span") ?? [],
+    ).find((span) => span.textContent === "science-books-space");
+    if (postCodeId) postCodeId.id = "hero-post-id";
+    const postId = document.querySelector<HTMLElement>("#hero-post-id");
+    const status = document.querySelector<HTMLElement>("#hero-status");
+    const installButton =
+      document.querySelector<HTMLButtonElement>("#copy-install");
+    const posts = JSON.parse(resultList?.dataset.posts ?? "[]") as {
+      id: string;
+      title: string;
+      content: string;
+    }[];
+    if (resultList && postSelect && postId && status && posts.length) {
+      const model = createModel(posts);
+      const titleById = new Map(posts.map((post) => [post.id, post.title]));
+      const renderResults = () => {
+        const id = postSelect.value;
+        const start = performance.now();
+        const rows = model.findRelatedScored(id, { limit: 3 });
+        const elapsed = performance.now() - start;
+        postId.textContent = id;
+        status.textContent = `IN YOUR BROWSER · ${elapsed.toFixed(1)} MS`;
+        resultList.replaceChildren(
+          ...rows.map((row, index) => {
+            const item = document.createElement("li");
+            item.className = `live-result${index === 0 ? " top" : ""}`;
+            item.dataset.postId = row.id;
+            const rank = document.createElement("span");
+            rank.className = "live-rank";
+            rank.textContent = `0${index + 1}`;
+            const title = document.createElement("span");
+            title.className = "live-title";
+            title.textContent = titleById.get(row.id) ?? row.id;
+            const score = document.createElement("span");
+            score.className = "live-score";
+            score.textContent = row.score.toFixed(2);
+            const chips = document.createElement("span");
+            chips.className = "term-chips";
+            for (const term of model.explainRelated(id, row.id).slice(0, 3)) {
+              const chip = document.createElement("code");
+              chip.textContent = term.term;
+              chips.append(chip);
+            }
+            item.append(rank, title, score, chips);
+            return item;
+          }),
+        );
+      };
+      postSelect.addEventListener("change", renderResults);
+      renderResults();
+    }
+    installButton?.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(
+        "pnpm add relatinator\npnpm add astro-relatinator",
+      );
+      installButton.textContent = "Copied";
+      window.setTimeout(() => {
+        installButton.textContent = "Copy";
+      }, 1500);
+    });
+    document.documentElement.classList.add("js");
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+      for (const entry of entries)
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-in");
+          observer.unobserve(entry.target);
+        }
+    });
+    document
+      .querySelectorAll(".reveal")
+      .forEach((element) => revealObserver.observe(element));
+  </script>
+</Layout>

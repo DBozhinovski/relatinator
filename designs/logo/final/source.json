@@ -1,0 +1,20 @@
+{
+  "direction": "A / Shared tile",
+  "colors": {
+    "ink": "#192029",
+    "cobalt": "#0a6ddd",
+    "paper": "#f8fafd",
+    "reversed_ink": "#eff2f6"
+  },
+  "palette_authority": "User-specified HEX values. No replacement conversion applied.",
+  "font_file": "/var/home/darko/Work/wts/blog/dist/client/fonts/space-grotesk-latin.woff2",
+  "font_license": "SIL Open Font License 1.1",
+  "font_license_evidence": "Local font name table entry 14: https://scripts.sil.org/OFL",
+  "logo_weight": 600,
+  "tagline_weight": 500,
+  "tagline_size_px": 32,
+  "favicon_visual_padding": 2,
+  "touch_icon_visual_padding_px": 36,
+  "horizontal_optical_alignment": "Symbol shifted to center on outlined wordmark, not artboard center.",
+  "regeneration": "Run designs/logo/build.py --final with Python and fontTools. Rendering uses the skill-local Python."
+}

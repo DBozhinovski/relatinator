@@ -1,0 +1,19 @@
+---
+interface Props {
+  headings: Array<{ depth: number; slug: string; text: string }>;
+}
+const { headings } = Astro.props;
+
+const sections = headings.filter((heading) => heading.depth > 1);
+---
+
+<nav class="docs-toc" aria-label="On this page">
+  <p class="docs-toc-title">On this page</p>
+  <ul>
+    {sections.map((section) => (
+      <li class={`depth-${section.depth}`}>
+        <a href={`#${section.slug}`}>{section.text}</a>
+      </li>
+    ))}
+  </ul>
+</nav>

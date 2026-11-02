@@ -1,0 +1,25 @@
+{
+  "name": "site",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "precheck": "pnpm --filter \"site^...\" run build",
+    "check": "astro check",
+    "pretest": "pnpm --filter \"site^...\" run build",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "astro": "7.3.8",
+    "relatinator": "workspace:^"
+  },
+  "devDependencies": {
+    "@astrojs/markdown-satteri": "0.4.3",
+    "@astrojs/check": "0.9.10",
+    "@playwright/test": "1.64.1",
+    "typescript": "6.0.3"
+  }
+}

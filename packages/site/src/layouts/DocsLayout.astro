@@ -1,0 +1,24 @@
+---
+// Extends the base page layout with the docs grid: sidebar, content column, table of contents.
+import Layout from "./Layout.astro";
+import DocsSidebar from "../components/DocsSidebar.astro";
+import Toc from "../components/Toc.astro";
+
+interface Props {
+  title: string;
+  active: string;
+  headings: Array<{ depth: number; slug: string; text: string }>;
+}
+
+const { title, active, headings } = Astro.props;
+---
+
+<Layout title={title} active="docs">
+  <div class="docs-grid">
+    <DocsSidebar active={active} />
+    <div class="docs-content">
+      <slot />
+    </div>
+    <Toc headings={headings} />
+  </div>
+</Layout>

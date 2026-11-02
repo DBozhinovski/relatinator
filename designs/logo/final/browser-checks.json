@@ -1,0 +1,82 @@
+[
+  {
+    "scheme": "light",
+    "size": 16,
+    "pixels": {
+      "ink": [
+        25,
+        32,
+        41,
+        255
+      ],
+      "cobalt": [
+        10,
+        109,
+        221,
+        255
+      ],
+      "dark": false
+    },
+    "output": "/var/home/darko/Work/relatinator-site/designs/logo/final/favicon-16-light-browser.png"
+  },
+  {
+    "scheme": "light",
+    "size": 32,
+    "pixels": {
+      "ink": [
+        25,
+        32,
+        41,
+        255
+      ],
+      "cobalt": [
+        10,
+        109,
+        221,
+        255
+      ],
+      "dark": false
+    },
+    "output": "/var/home/darko/Work/relatinator-site/designs/logo/final/favicon-32-light-browser.png"
+  },
+  {
+    "scheme": "dark",
+    "size": 16,
+    "pixels": {
+      "ink": [
+        239,
+        242,
+        246,
+        255
+      ],
+      "cobalt": [
+        10,
+        109,
+        221,
+        255
+      ],
+      "dark": true
+    },
+    "output": "/var/home/darko/Work/relatinator-site/designs/logo/final/favicon-16-dark-browser.png"
+  },
+  {
+    "scheme": "dark",
+    "size": 32,
+    "pixels": {
+      "ink": [
+        239,
+        242,
+        246,
+        255
+      ],
+      "cobalt": [
+        10,
+        109,
+        221,
+        255
+      ],
+      "dark": true
+    },
+    "output": "/var/home/darko/Work/relatinator-site/designs/logo/final/favicon-32-dark-browser.png"
+  }
+]

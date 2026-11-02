@@ -1,0 +1,10 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/.astro
+.pi
+**/test-results
+**/playwright-report
+*.patch
+*.log

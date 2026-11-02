@@ -1,0 +1,820 @@
+{
+  "master_count": 10,
+  "renders": [
+    {
+      "file": "renders/a-lockup-color-16px-light.png",
+      "width": 101,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-16px-dark.png",
+      "width": 101,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-28px-light.png",
+      "width": 177,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-28px-dark.png",
+      "width": 177,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-32px-light.png",
+      "width": 203,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-32px-dark.png",
+      "width": 203,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-64px-light.png",
+      "width": 406,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-64px-dark.png",
+      "width": 406,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-256px-light.png",
+      "width": 1622,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-color-256px-dark.png",
+      "width": 1622,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-16px-light.png",
+      "width": 101,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-16px-dark.png",
+      "width": 101,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-28px-light.png",
+      "width": 177,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-28px-dark.png",
+      "width": 177,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-32px-light.png",
+      "width": 203,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-32px-dark.png",
+      "width": 203,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-64px-light.png",
+      "width": 406,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-64px-dark.png",
+      "width": 406,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-256px-light.png",
+      "width": 1622,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-lockup-256px-dark.png",
+      "width": 1622,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-16px-light.png",
+      "width": 16,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-16px-dark.png",
+      "width": 16,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-28px-light.png",
+      "width": 28,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-28px-dark.png",
+      "width": 28,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-32px-light.png",
+      "width": 32,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-32px-dark.png",
+      "width": 32,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-64px-light.png",
+      "width": 64,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-64px-dark.png",
+      "width": 64,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-256px-light.png",
+      "width": 256,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-color-256px-dark.png",
+      "width": 256,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-16px-light.png",
+      "width": 16,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-16px-dark.png",
+      "width": 16,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-28px-light.png",
+      "width": 28,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-28px-dark.png",
+      "width": 28,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-32px-light.png",
+      "width": 32,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-32px-dark.png",
+      "width": 32,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-64px-light.png",
+      "width": 64,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-64px-dark.png",
+      "width": 64,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-256px-light.png",
+      "width": 256,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/a-symbol-256px-dark.png",
+      "width": 256,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-16px-light.png",
+      "width": 16,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-16px-dark.png",
+      "width": 16,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-28px-light.png",
+      "width": 28,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-28px-dark.png",
+      "width": 28,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-32px-light.png",
+      "width": 32,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-32px-dark.png",
+      "width": 32,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-64px-light.png",
+      "width": 64,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-64px-dark.png",
+      "width": 64,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-256px-light.png",
+      "width": 256,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-color-256px-dark.png",
+      "width": 256,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-16px-light.png",
+      "width": 16,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-16px-dark.png",
+      "width": 16,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-28px-light.png",
+      "width": 28,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-28px-dark.png",
+      "width": 28,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-32px-light.png",
+      "width": 32,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-32px-dark.png",
+      "width": 32,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-64px-light.png",
+      "width": 64,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-64px-dark.png",
+      "width": 64,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-256px-light.png",
+      "width": 256,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-favicon-256px-dark.png",
+      "width": 256,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-16px-light.png",
+      "width": 86,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-16px-dark.png",
+      "width": 86,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-28px-light.png",
+      "width": 151,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-28px-dark.png",
+      "width": 151,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-32px-light.png",
+      "width": 172,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-32px-dark.png",
+      "width": 172,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-64px-light.png",
+      "width": 345,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-64px-dark.png",
+      "width": 345,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-256px-light.png",
+      "width": 1379,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-color-256px-dark.png",
+      "width": 1379,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-16px-light.png",
+      "width": 86,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-16px-dark.png",
+      "width": 86,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-28px-light.png",
+      "width": 151,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-28px-dark.png",
+      "width": 151,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-32px-light.png",
+      "width": 172,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-32px-dark.png",
+      "width": 172,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-64px-light.png",
+      "width": 345,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-64px-dark.png",
+      "width": 345,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-256px-light.png",
+      "width": 1379,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/b-wordmark-256px-dark.png",
+      "width": 1379,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-16px-light.png",
+      "width": 16,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-16px-dark.png",
+      "width": 16,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-28px-light.png",
+      "width": 28,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-28px-dark.png",
+      "width": 28,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-32px-light.png",
+      "width": 32,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-32px-dark.png",
+      "width": 32,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-64px-light.png",
+      "width": 64,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-64px-dark.png",
+      "width": 64,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-256px-light.png",
+      "width": 256,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-color-256px-dark.png",
+      "width": 256,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-16px-light.png",
+      "width": 16,
+      "height": 16,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-16px-dark.png",
+      "width": 16,
+      "height": 16,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-28px-light.png",
+      "width": 28,
+      "height": 28,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-28px-dark.png",
+      "width": 28,
+      "height": 28,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-32px-light.png",
+      "width": 32,
+      "height": 32,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-32px-dark.png",
+      "width": 32,
+      "height": 32,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-64px-light.png",
+      "width": 64,
+      "height": 64,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-64px-dark.png",
+      "width": 64,
+      "height": 64,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-256px-light.png",
+      "width": 256,
+      "height": 256,
+      "background": "#f8fafc",
+      "reversed": false,
+      "backend": "cairosvg"
+    },
+    {
+      "file": "renders/c-monogram-256px-dark.png",
+      "width": 256,
+      "height": 256,
+      "background": "#161b22",
+      "reversed": true,
+      "backend": "cairosvg"
+    }
+  ],
+  "overview": {
+    "file": "overview.png",
+    "width": 1600,
+    "height": 1400,
+    "backend": "cairosvg"
+  },
+  "checks": {
+    "master_xml_allowlist": true,
+    "external_references": false,
+    "scripts": false,
+    "live_master_text": false,
+    "raster_master_images": false
+  },
+  "sizing": "Pixel size names specify height. Symbols are square. Large height is 256px.",
+  "dark_mode": "Black and ink reverse to paper. Cobalt remains unchanged."
+}

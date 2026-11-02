@@ -1,0 +1,75 @@
+/* Hallmark · pre-emit critique: P4 H5 E4 S5 R4 V5 · genre: modern-minimal · theme: cobalt · design-system: DESIGN.md · designed-as-app */
+:root {
+  color-scheme: light dark;
+  --color-paper: oklch(98.5% 0.004 250);
+  --color-paper-2: oklch(96.5% 0.006 252);
+  --color-ink: oklch(24% 0.02 258);
+  --color-ink-2: oklch(34% 0.018 257);
+  --color-muted: oklch(48% 0.016 257);
+  --color-rule: oklch(90% 0.008 255);
+  --color-rule-2: oklch(84% 0.01 255);
+  --color-accent: oklch(55% 0.19 257);
+  --color-accent-ink: oklch(98.5% 0.004 250);
+  --color-focus: oklch(55% 0.19 257);
+  --color-graphite: oklch(22% 0.016 260);
+  --color-graphite-text: oklch(90% 0.008 250);
+  --color-graphite-muted: oklch(70% 0.014 255);
+  --color-graphite-accent: oklch(72% 0.14 252);
+  --color-graphite-rule: oklch(32% 0.016 260);
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.625rem;
+  --text-2xl: 2.125rem;
+  --text-display: clamp(2.25rem, 1.4rem + 3.2vw, 3.75rem);
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+  --space-3xl: 7rem;
+  --radius-control: 6px;
+  --radius-card: 10px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-short: 150ms;
+  --dur-med: 240ms;
+  --dur-reveal: 600ms;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --color-paper: oklch(18% 0.014 260);
+    --color-paper-2: oklch(22% 0.016 260);
+    --color-ink: oklch(96% 0.006 250);
+    --color-ink-2: oklch(86% 0.01 252);
+    --color-muted: oklch(70% 0.014 255);
+    --color-rule: oklch(30% 0.016 260);
+    --color-rule-2: oklch(36% 0.018 260);
+    --color-accent: oklch(70% 0.15 254);
+    --color-accent-ink: oklch(18% 0.02 260);
+    --color-focus: oklch(70% 0.15 254);
+    --color-graphite: oklch(14% 0.012 260);
+    --color-graphite-rule: oklch(30% 0.016 260);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: oklch(18% 0.014 260);
+  --color-paper-2: oklch(22% 0.016 260);
+  --color-ink: oklch(96% 0.006 250);
+  --color-ink-2: oklch(86% 0.01 252);
+  --color-muted: oklch(70% 0.014 255);
+  --color-rule: oklch(30% 0.016 260);
+  --color-rule-2: oklch(36% 0.018 260);
+  --color-accent: oklch(70% 0.15 254);
+  --color-accent-ink: oklch(18% 0.02 260);
+  --color-focus: oklch(70% 0.15 254);
+  --color-graphite: oklch(14% 0.012 260);
+  --color-graphite-rule: oklch(30% 0.016 260);
+}
+:root[data-theme="light"] { color-scheme: light; }

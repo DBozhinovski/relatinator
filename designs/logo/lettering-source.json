@@ -1,0 +1,12 @@
+{
+  "font_file": "/var/home/darko/Work/wts/blog/dist/client/fonts/space-grotesk-latin.woff2",
+  "font_family": "Space Grotesk",
+  "weight": 600,
+  "license": "SIL Open Font License 1.1",
+  "license_evidence": "Font name table entry 14: https://scripts.sil.org/OFL",
+  "word": "relatinator",
+  "tracking_svg_units": 0.35,
+  "font_units_to_svg": 0.08,
+  "custom_detail": "B replaces the i dot with a filled crossbar that meets the first t stem.",
+  "c_header": "The companion wordmark appears only as site context in the overview."
+}

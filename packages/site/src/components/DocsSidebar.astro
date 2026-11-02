@@ -1,0 +1,36 @@
+---
+interface Props {
+  active: string | null;
+}
+const { active } = Astro.props;
+const PAGES = [
+  { slug: "relatinator", label: "relatinator" },
+  { slug: "astro-relatinator", label: "astro-relatinator" },
+  { slug: "architecture", label: "Architecture" },
+];
+---
+
+<aside class="docs-sidebar">
+  <details id="docs-index">
+    <summary>Docs</summary>
+    <nav aria-label="Docs">
+      {PAGES.map((page) => (
+        <a
+          href={`/docs/${page.slug}/`}
+          aria-current={active === page.slug ? "page" : undefined}
+        >
+          {page.label}
+        </a>
+      ))}
+    </nav>
+  </details>
+</aside>
+<script>
+  const details = document.querySelector<HTMLDetailsElement>("#docs-index");
+  const desktop = matchMedia("(min-width: 60rem)");
+  const syncDetails = () => {
+    if (details) details.open = desktop.matches;
+  };
+  syncDetails();
+  desktop.addEventListener("change", syncDetails);
+</script>

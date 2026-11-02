@@ -1,0 +1,77 @@
+{
+  "ink": {
+    "oklch": [
+      0.24,
+      0.02,
+      258
+    ],
+    "hex": "#192029",
+    "rgb": [
+      25,
+      32,
+      41
+    ],
+    "srgb_before_clipping_and_rounding": [
+      0.09955551229897575,
+      0.12403883092141624,
+      0.16017276638858163
+    ],
+    "linear_srgb_before_clipping": [
+      0.009953982995250719,
+      0.01416665954285102,
+      0.022023362393610958
+    ],
+    "in_srgb_gamut": true,
+    "conversion": "OKLab D65 to linear sRGB, sRGB transfer, channel clipping, nearest 8-bit rounding"
+  },
+  "cobalt": {
+    "oklch": [
+      0.58,
+      0.2,
+      256
+    ],
+    "hex": "#0076ed",
+    "rgb": [
+      0,
+      118,
+      237
+    ],
+    "srgb_before_clipping_and_rounding": [
+      -0.01788257792122535,
+      0.4622410547010903,
+      0.9277021719070832
+    ],
+    "linear_srgb_before_clipping": [
+      -0.0013841004582991756,
+      0.18074124500853647,
+      0.8433477586435618
+    ],
+    "in_srgb_gamut": false,
+    "conversion": "OKLab D65 to linear sRGB, sRGB transfer, channel clipping, nearest 8-bit rounding"
+  },
+  "graphite": {
+    "oklch": [
+      0.22,
+      0.016,
+      260
+    ],
+    "hex": "#161b22",
+    "rgb": [
+      22,
+      27,
+      34
+    ],
+    "srgb_before_clipping_and_rounding": [
+      0.08732554874306003,
+      0.10512171183042052,
+      0.133927100826449
+    ],
+    "linear_srgb_before_clipping": [
+      0.008167195988832,
+      0.010836140701485104,
+      0.016117598065206476
+    ],
+    "in_srgb_gamut": true,
+    "conversion": "OKLab D65 to linear sRGB, sRGB transfer, channel clipping, nearest 8-bit rounding"
+  }
+}

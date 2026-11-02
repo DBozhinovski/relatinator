@@ -1,0 +1,30 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import { getCollection, getEntry, render } from "astro:content";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("docs");
+  return entries.map((entry) => ({ params: { slug: entry.id }, props: {} }));
+}
+
+const slug = Astro.params.slug;
+const entry = await getEntry("docs", slug);
+if (!entry) {
+  return new Response("<p>Not found</p>", {
+    status: 404,
+    headers: { "content-type": "text/html" },
+  });
+}
+
+const { Content, headings } = await render(entry);
+const pageHeading =
+  headings.find((heading) => heading.depth === 1)?.text ?? slug;
+---
+
+<DocsLayout
+  title={`${pageHeading} · Relatinator`}
+  active={slug}
+  headings={headings}
+>
+  <Content />
+</DocsLayout>

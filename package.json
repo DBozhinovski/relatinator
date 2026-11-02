@@ -2,8 +2,8 @@
   "name": "relatinator-root",
   "private": "true",
   "scripts": {
-    "check": "pnpm -r --if-present run check",
-    "test": "pnpm -r --if-present run test",
+    "check": "pnpm -r --workspace-concurrency=1 --if-present run check",
+    "test": "pnpm -r --workspace-concurrency=1 --if-present run test",
     "build": "pnpm -r --if-present run build"
   },
   "workspaces": [

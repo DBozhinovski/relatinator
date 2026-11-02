@@ -1,0 +1,450 @@
+[
+  {
+    "file": "a-lockup-color.svg",
+    "bytes": 4598,
+    "viewBox": [
+      0.0,
+      0.0,
+      507.0,
+      80.0
+    ],
+    "aspect": 6.338,
+    "aspect_class": "extra-wide",
+    "colors": [
+      "#192029",
+      "#0076ed"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      8.0,
+      5.44,
+      497.65,
+      64.0
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 9.4,
+      "top": 5.4,
+      "bottom": 16.0
+    },
+    "bbox_fill_ratio": 0.707,
+    "score": 98,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      },
+      {
+        "level": "INFO",
+        "code": "extra-wide",
+        "message": "Extra-wide lockup (>4.5:1) shrinks badly; provide a stacked lockup and a standalone symbol."
+      }
+    ]
+  },
+  {
+    "file": "a-lockup.svg",
+    "bytes": 4589,
+    "viewBox": [
+      0.0,
+      0.0,
+      507.0,
+      80.0
+    ],
+    "aspect": 6.338,
+    "aspect_class": "extra-wide",
+    "colors": [
+      "#000000"
+    ],
+    "gradients": 0,
+    "anchors": 254,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      8.0,
+      5.44,
+      497.65,
+      64.0
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 9.4,
+      "top": 5.4,
+      "bottom": 16.0
+    },
+    "bbox_fill_ratio": 0.707,
+    "score": 98,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "254 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      },
+      {
+        "level": "INFO",
+        "code": "extra-wide",
+        "message": "Extra-wide lockup (>4.5:1) shrinks badly; provide a stacked lockup and a standalone symbol."
+      }
+    ]
+  },
+  {
+    "file": "a-symbol-color.svg",
+    "bytes": 331,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#192029",
+      "#0076ed"
+    ],
+    "gradients": 0,
+    "anchors": 19,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      8.0,
+      8.0,
+      56.0,
+      56.0
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 8.0,
+      "top": 8.0,
+      "bottom": 8.0
+    },
+    "bbox_fill_ratio": 0.562,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "a-symbol.svg",
+    "bytes": 322,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#000000"
+    ],
+    "gradients": 0,
+    "anchors": 19,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      8.0,
+      8.0,
+      56.0,
+      56.0
+    ],
+    "margins": {
+      "left": 8.0,
+      "right": 8.0,
+      "top": 8.0,
+      "bottom": 8.0
+    },
+    "bbox_fill_ratio": 0.562,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "b-favicon-color.svg",
+    "bytes": 316,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#192029",
+      "#0076ed"
+    ],
+    "gradients": 0,
+    "anchors": 16,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      13.0,
+      10.0,
+      51.0,
+      54.0
+    ],
+    "margins": {
+      "left": 13.0,
+      "right": 13.0,
+      "top": 10.0,
+      "bottom": 10.0
+    },
+    "bbox_fill_ratio": 0.408,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "b-favicon.svg",
+    "bytes": 264,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#000000"
+    ],
+    "gradients": 0,
+    "anchors": 11,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      13.0,
+      10.0,
+      51.0,
+      54.0
+    ],
+    "margins": {
+      "left": 13.0,
+      "right": 13.0,
+      "top": 10.0,
+      "bottom": 10.0
+    },
+    "bbox_fill_ratio": 0.408,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "b-wordmark-color.svg",
+    "bytes": 4260,
+    "viewBox": [
+      0.0,
+      0.0,
+      431.0,
+      80.0
+    ],
+    "aspect": 5.388,
+    "aspect_class": "extra-wide",
+    "colors": [
+      "#192029",
+      "#0076ed"
+    ],
+    "gradients": 0,
+    "anchors": 231,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      11.85,
+      6.0,
+      421.65,
+      63.12
+    ],
+    "margins": {
+      "left": 11.8,
+      "right": 9.4,
+      "top": 6.0,
+      "bottom": 16.9
+    },
+    "bbox_fill_ratio": 0.679,
+    "score": 98,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "231 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      },
+      {
+        "level": "INFO",
+        "code": "extra-wide",
+        "message": "Extra-wide lockup (>4.5:1) shrinks badly; provide a stacked lockup and a standalone symbol."
+      }
+    ]
+  },
+  {
+    "file": "b-wordmark.svg",
+    "bytes": 4251,
+    "viewBox": [
+      0.0,
+      0.0,
+      431.0,
+      80.0
+    ],
+    "aspect": 5.388,
+    "aspect_class": "extra-wide",
+    "colors": [
+      "#000000"
+    ],
+    "gradients": 0,
+    "anchors": 231,
+    "library_anchor_percentiles": {
+      "p10": 23.0,
+      "p25": 37.0,
+      "median": 75.0,
+      "p75": 155.0,
+      "p90": 257.8,
+      "p95": 379.45
+    },
+    "content_bbox": [
+      11.85,
+      6.0,
+      421.65,
+      63.12
+    ],
+    "margins": {
+      "left": 11.8,
+      "right": 9.4,
+      "top": 6.0,
+      "bottom": 16.9
+    },
+    "bbox_fill_ratio": 0.679,
+    "score": 98,
+    "findings": [
+      {
+        "level": "INFO",
+        "code": "complexity",
+        "message": "231 anchor points (library median 75.0, p75 155.0). Check every point earns its place."
+      },
+      {
+        "level": "INFO",
+        "code": "extra-wide",
+        "message": "Extra-wide lockup (>4.5:1) shrinks badly; provide a stacked lockup and a standalone symbol."
+      }
+    ]
+  },
+  {
+    "file": "c-monogram-color.svg",
+    "bytes": 268,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#0076ed"
+    ],
+    "gradients": 0,
+    "anchors": 15,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      12.0,
+      10.0,
+      52.0,
+      54.0
+    ],
+    "margins": {
+      "left": 12.0,
+      "right": 12.0,
+      "top": 10.0,
+      "bottom": 10.0
+    },
+    "bbox_fill_ratio": 0.43,
+    "score": 100,
+    "findings": []
+  },
+  {
+    "file": "c-monogram.svg",
+    "bytes": 259,
+    "viewBox": [
+      0.0,
+      0.0,
+      64.0,
+      64.0
+    ],
+    "aspect": 1.0,
+    "aspect_class": "square",
+    "colors": [
+      "#000000"
+    ],
+    "gradients": 0,
+    "anchors": 15,
+    "library_anchor_percentiles": {
+      "p10": 21.0,
+      "p25": 31.0,
+      "median": 53.0,
+      "p75": 95.5,
+      "p90": 194.0,
+      "p95": 274.0
+    },
+    "content_bbox": [
+      12.0,
+      10.0,
+      52.0,
+      54.0
+    ],
+    "margins": {
+      "left": 12.0,
+      "right": 12.0,
+      "top": 10.0,
+      "bottom": 10.0
+    },
+    "bbox_fill_ratio": 0.43,
+    "score": 100,
+    "findings": []
+  }
+]

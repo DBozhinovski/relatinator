@@ -1,0 +1,131 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { Code } from "astro:components";
+import { getCollection } from "astro:content";
+import { graphiteTheme } from "../lib/shiki-theme";
+const posts = (await getCollection("demoPosts"))
+  .sort((a, b) => a.id.localeCompare(b.id))
+  .map((entry) => ({
+    id: entry.id,
+    title: entry.data.title,
+    content: entry.body,
+  }));
+const topicLines = [
+  "space: black holes, gravitational waves, exoplanets, cosmology, astronomy, telescopes, planets, the universe",
+  "biology: evolution, genetics, DNA, cells, ecosystems, animals, plants, microbes, the brain",
+  "technology: programming, software, AI, machine learning, computers, the internet, startups",
+  "climate: climate change, carbon, oceans, weather, energy, renewable power, the environment",
+  "physics: quantum mechanics, particles, relativity, thermodynamics, light, matter, energy",
+];
+const defaultText =
+  "Chang explains the latest theories about black holes and the information paradox";
+---
+
+<Layout title="Demo · Relatinator" active="demo">
+  <div class="demo-column">
+    <header class="demo-page-head">
+      <h1>Try relatinator in your browser</h1>
+      <p class="lead">
+        Everything here runs in your browser with the same package you install
+        from npm. The posts are the six from the playground folder in the repo.
+      </p>
+    </header>
+    <section class="demo-section" aria-labelledby="related-posts">
+      <h2 id="related-posts">Related posts</h2>
+      <div class="demo-panel">
+        <div class="demo-controls">
+          <label for="demo-post">Post</label>
+          <select id="demo-post" class="demo-select">
+            {posts.map((post, index) => (
+              <option value={post.id} selected={index === 0}>
+                {post.title}
+              </option>
+            ))}
+          </select>
+          <div class="demo-methods" role="group" aria-label="Method">
+            <input
+              id="demo-method-bm25"
+              type="radio"
+              name="demo-method"
+              checked
+            />
+            <label for="demo-method-bm25">BM25</label>
+            <input id="demo-method-tfidf" type="radio" name="demo-method" />
+            <label for="demo-method-tfidf">TF-IDF</label>
+          </div>
+          <label for="demo-query">Or paste your own text</label>
+          <textarea id="demo-query" class="demo-query"></textarea>
+        </div>
+        <ol
+          id="demo-related"
+          class="demo-results"
+          aria-label="Related posts"
+          aria-live="polite"
+        ></ol>
+        <div id="demo-corpus" hidden data-posts={JSON.stringify(posts)}></div>
+      </div>
+      <div class="code-card">
+        <div class="code-head">
+          <code>related.ts</code>
+        </div>
+        <Code
+          lang="ts"
+          theme={graphiteTheme}
+          code={`import { createModel } from "relatinator";\n\nconst posts = [{ id: "post-one", content: "…" }];\nconst model = createModel(posts, { method });\nconst related = model.findRelatedScored(id);\nconst why = model.explainRelated(id, otherId);`}
+        />
+      </div>
+    </section>
+    <section class="demo-section" aria-labelledby="topics-from-a-fixed-list">
+      <h2 id="topics-from-a-fixed-list">Topics from a fixed list</h2>
+      <div class="demo-panel">
+        <div class="demo-topic-controls">
+          <label for="demo-topics">Topics</label>
+          <textarea
+            id="demo-topics"
+            class="demo-topics"
+            rows="5"
+          >{topicLines.join("\n")}</textarea>
+          <label for="demo-text">Text</label>
+          <textarea id="demo-text" class="demo-text">{defaultText}</textarea>
+          <label for="demo-ratio">Ratio</label>
+          <div class="demo-ratio-row">
+            <input
+              id="demo-ratio"
+              class="demo-ratio"
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value="0.5"
+            />
+            <output
+              id="demo-ratio-value"
+              class="demo-ratio-value"
+              for="demo-ratio"
+            >
+              0.5
+            </output>
+          </div>
+        </div>
+        <ol
+          id="demo-topic-results"
+          class="demo-results"
+          aria-label="Topics for this text"
+          aria-live="polite"
+        ></ol>
+      </div>
+      <p id="demo-alert" role="alert"></p>
+      <div class="code-card">
+        <div class="code-head">
+          <code>topics.ts</code>
+        </div>
+        <Code
+          lang="ts"
+          theme={graphiteTheme}
+          code={`import { classify } from "relatinator";\n\nconst topics = [{ tag: "space", description: "black holes, gravitational waves" }];\nconst best = classify(topics, text, { ratio });`}
+        />
+      </div>
+    </section>
+    <script src="../scripts/demo.ts"></script>
+  </div>
+</Layout>
