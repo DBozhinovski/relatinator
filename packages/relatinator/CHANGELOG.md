@@ -2,6 +2,20 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
+## [3.4.0] - 2026-11-02
+
+This release adds `relatinator/llm`, an optional entry point that chooses topics with a language model. The main entry point does not change.
+
+`relatinator/llm` is experimental. It is not the final shape of the API. Its names, defaults, and scores can change in a minor release. Pin an exact version if you use it.
+
+- **New:** `classifyWithLLM(topics, text, { judge, minScore, limit })` chooses topics from a fixed list with a language model. The score is the log-odds of "yes" over "no". The defaults are `minScore: 0` and `limit: 2`.
+- **New:** `logprobJudge(endpoint)` reads the logprobs of a yes/no answer for each topic, after the `noul` question of [ruling](https://github.com/bradAGI/ruling). `jsonJudge(endpoint, { attempts })` asks for a probability for each topic, for endpoints without logprobs. It asks again when a reply has no JSON object.
+- **New:** `describeTopics(tags, posts, endpoint)` writes a description for each tag from the titles and summaries of the posts.
+- The endpoint is any OpenAI-compatible chat endpoint, local or hosted. `relatinator/llm` has no dependencies and uses `fetch`.
+- **Tooling:** `pnpm run eval` scores `classify()` or `classifyWithLLM()` against approved labels. The portability check now also bundles `dist/llm.js`.
+- **Docs:** The README has a new section, "Topics with a language model". `docs/architecture.md` has the eval results and a model-size comparison.
+- `classify()` and the model give the same results as in 3.3.0. The minified bundle of `dist/index.js` is 10153 bytes, and `dist/llm.js` is 3681 bytes.
+
 ## [3.3.0] - 2026-10-19
 
 This release adds filters that apply before the limit, scores, and the shared terms of two documents. Without the new options, the results do not change.
