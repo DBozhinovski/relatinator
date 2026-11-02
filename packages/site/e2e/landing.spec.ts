@@ -118,7 +118,7 @@ test("features, scoring steps, install and compatibility match the contract", as
     ],
     [
       "Topics from a fixed list",
-      "classify(topics, text) matches text against topic descriptions you write. You don't train anything or ship a model file, and the text never leaves your process.",
+      "classify(topics, text) matches text against topic descriptions you write. You don't train anything or ship a model file, and the text never leaves your process. Want a language model to judge instead? Try the experimental relatinator/llm.",
     ],
   ]) {
     const heading = page.getByRole("heading", { level: 2, name: title });

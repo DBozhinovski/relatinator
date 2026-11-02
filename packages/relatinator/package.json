@@ -22,6 +22,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./llm": {
+      "types": "./dist/llm.d.ts",
+      "import": "./dist/llm.js"
     }
   },
   "files": [
@@ -36,6 +40,7 @@
     "prepack": "pnpm run build",
     "test": "vitest run",
     "bench": "pnpm run build && node bench/bench.mjs",
+    "eval": "pnpm run build && node eval/classify.mjs",
     "test:portability": "pnpm run build && node scripts/check-portability.js",
     "check": "tsc --noEmit && tsc -p test",
     "format": "prettier --write .",

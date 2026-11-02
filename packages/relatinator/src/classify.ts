@@ -13,6 +13,14 @@ function documentOf({ tag, description }: Topic): RelatinatorDocument {
   return { id: tag, content: description ? `${tag}\n${description}` : tag };
 }
 
+export function checkTopicTags(topics: readonly Topic[]): void {
+  const tags = new Set<string>();
+  for (const { tag } of topics) {
+    if (tags.has(tag)) throw new Error(`Duplicate topic tag: "${tag}"`);
+    tags.add(tag);
+  }
+}
+
 export function classify(
   topics: readonly Topic[],
   text: string,
@@ -21,11 +29,7 @@ export function classify(
   if (typeof ratio !== "number" || !(ratio >= 0 && ratio <= 1)) {
     throw new RangeError(`Invalid ratio: ${ratio}. Use a number from 0 to 1.`);
   }
-  const tags = new Set<string>();
-  for (const { tag } of topics) {
-    if (tags.has(tag)) throw new Error(`Duplicate topic tag: "${tag}"`);
-    tags.add(tag);
-  }
+  checkTopicTags(topics);
   const totals = createScorer(topics.map(documentOf), "bm25", {}).scoreText(
     text
   );

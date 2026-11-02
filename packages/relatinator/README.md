@@ -138,6 +138,70 @@ The score is relative to the other topics for the same text, so do not compare s
 
 `classify` does not read your tagged posts. It uses only the topic list. Thus it has the same cost for a new site and for a site with many posts.
 
+## Topics with a language model
+
+> **Experimental.** `relatinator/llm` is not the final shape of this API. Names, defaults, and scores can change in a minor release. Pin an exact version if you use it, for example `"relatinator": "3.4.0"`.
+
+`relatinator/llm` chooses topics from the same list with a language model. It is optional. It has no dependencies, but it needs an OpenAI-compatible chat endpoint. The endpoint can be a local server, such as llama.cpp, or a hosted API with a key. Each post takes about 1 to 6 seconds, so use it at build time or in a script, not when a page renders.
+
+In a test with 37 blog posts, `classify` got an F1 of 0.68. A 4B model on a laptop GPU got 0.85 with the same topic list. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-language-model-as-an-option) gives the numbers.
+
+```ts
+import { classifyWithLLM, describeTopics, logprobJudge } from "relatinator/llm";
+
+const endpoint = { baseURL: "http://127.0.0.1:8080/v1", model: "qwen3-4b" };
+
+// One time: write a description for each tag from your posts.
+const topics = await describeTopics(
+  ["community", "astro", "career"],
+  posts.map((p) => ({ title: p.title, summary: p.description })),
+  endpoint
+);
+
+// For each post:
+const judge = logprobJudge(endpoint);
+await classifyWithLLM(topics, post.body, { judge });
+// [{ tag: "community", score: 18.2 }]
+```
+
+### `classifyWithLLM(topics, text, options)`
+
+Returns a promise of `{ tag, score }[]`, best first. `topics` follows the same rules as in `classify`.
+
+- `options.judge` is a `TopicJudge`, for example `logprobJudge(endpoint)` or `jsonJudge(endpoint)`. A judge is a function `(text, topics) => Promise<number[]>`.
+- `options.minScore` is the lowest score to keep (default `0`).
+- `options.limit` is the maximum number of topics (default `2`).
+
+The score is the log-odds of "yes" over "no". A score of 0 is even, and a positive score means that the topic applies. Unlike `classify`, the scores of different texts are comparable, and the result can be `[]`.
+
+### `logprobJudge(endpoint, options?)` and `jsonJudge(endpoint, options?)`
+
+- `logprobJudge` asks one yes/no question for each topic and reads the logprobs of the answer. It needs an endpoint that returns `top_logprobs`. llama.cpp and vLLM do. Many hosted models do not. It makes 2 requests for each topic, one at a time.
+- `jsonJudge` asks for a probability for each topic in one request. Use it when the endpoint gives no logprobs, for example a reasoning model.
+- `options.maxChars` is the number of characters of the text that the model reads (default `40000`). Make it smaller for a model with a small context.
+
+`endpoint` is a `ChatEndpoint`:
+
+- `baseURL`: the URL with the version path, for example `http://127.0.0.1:8080/v1`.
+- `model`: the model name.
+- `apiKey`: optional. It is sent as `Authorization: Bearer <apiKey>`.
+- `headers`: optional extra request headers.
+- `body`: optional extra fields for the request body.
+- `fetch`: optional replacement for the global `fetch`.
+
+A failed request throws an error with the status. `jsonJudge` asks again when a reply has no JSON object, up to `options.attempts` requests (default `3`). Some reasoning models sometimes send an empty reply.
+
+### `describeTopics(tags, posts, endpoint)`
+
+Writes one description for each tag from the titles and summaries of your posts. `posts` is an array of `{ title: string; summary?: string }`. Returns a promise of `Topic[]` in the order of `tags`. If the model gives no description for a tag, it throws an error with the missing tags. Read and edit the descriptions before you use them.
+
+### Choose a model
+
+- **Size.** Use a model with about 2B parameters or more. In the test, models under 1B did not do better than `classify`. Qwen3 4B Instruct (Q4_K_M, 2.5 GB) was the best local model. Gemma 4 E2B was the smallest model close to it.
+- **llama.cpp.** Add `body: { cache_prompt: true }`. The server then reads the post one time for all the questions about it. For Qwen3.5 models, also add `chat_template_kwargs: { enable_thinking: false }`. Then the first token is the answer.
+- **`minScore`.** The best cut changes with the model. Start at 0. If you get too many topics, increase it. `pnpm --filter relatinator eval` shows the best cut for labels that you approved.
+- **Descriptions.** The descriptions are still the largest lever. Descriptions from `describeTopics` gave 0.10 to 0.14 more F1 than descriptions from the tag names only.
+
 ## Best practices for topic lists
 
 `classify` matches words, not meanings. Thus the words in your topic list control most of the result. In a test with 38 blog posts, specific descriptions gave much better results than short, general ones. The code and the posts were the same. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-fixed-list-scored-by-their-descriptions) gives the numbers.
@@ -171,6 +235,7 @@ To get fewer topics with more correct ones, increase `ratio`. In the test, `rati
 
 - Write the list yourself from the subjects of your posts.
 - Give your posts to a language model one time, and ask it for a list. Then edit the list. After that, `classify` runs without the model.
+- Write the tags yourself, and let `describeTopics` write the descriptions. The tags stay yours. See [Topics with a language model](#topics-with-a-language-model).
 
 This prompt gives a list in the correct format:
 

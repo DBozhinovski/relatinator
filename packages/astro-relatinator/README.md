@@ -173,6 +173,8 @@ Do not read the field that has the existing tags of the entry. Without `fields`,
 
 `classify()` does not read the collection, and it does not use the model cache of `getRelated()`. It compares the text with the topic list only.
 
+To choose topics with a language model at build time, give the same text to `classifyWithLLM()` from the experimental `relatinator/llm` entry point. See [Topics with a language model](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#topics-with-a-language-model). It needs `relatinator` 3.4 or later and a chat endpoint.
+
 The topic list controls most of the result. To write it, read [Best practices for topic lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#best-practices-for-topic-lists).
 
 For EmDash entries, `emdashEntryText(entry, fields?)` from `astro-relatinator/emdash` returns the default EmDash text. Without `fields`, this text contains the labels of the taxonomy terms of the entry. For term suggestions in the entry editor, read [EmDash topic suggestions](#emdash-topic-suggestions).

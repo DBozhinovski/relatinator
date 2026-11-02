@@ -159,7 +159,7 @@ Load the fonts with the Astro Fonts API and the Fontsource provider. The build d
 Sections in DOM order:
 
 1. **Hero, split.** The grid is `minmax(0, 5fr) minmax(0, 6fr)` above 60rem and one column below. The title column comes first.
-   - Release chip, mono: `relatinator 3.3 · MIT`.
+   - Release chip, mono: `relatinator 3.4 · MIT`.
    - H1: `Find related posts when your site builds.`
    - Lead: `relatinator scores your documents against each other with BM25 or TF-IDF. It runs in Node.js, the browser, and Cloudflare Workers, and its only dependency is a stemmer. astro-relatinator hooks it into Astro content collections, so a related posts list is one getRelated call.`
    - Install block: a small graphite card with two lines, `pnpm add relatinator` and `pnpm add astro-relatinator`, and a `Copy` button.

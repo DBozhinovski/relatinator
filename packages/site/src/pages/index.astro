@@ -14,7 +14,7 @@ const features = [
   },
   {
     title: "Topics from a fixed list",
-    body: "classify(topics, text) matches text against topic descriptions you write. You don't train anything or ship a model file, and the text never leaves your process.",
+    body: "classify(topics, text) matches text against topic descriptions you write. You don't train anything or ship a model file, and the text never leaves your process. Want a language model to judge instead? Try the experimental relatinator/llm.",
     code: 'const topics = [{ tag: "space", description }];\nconst best = classify(topics, text);',
   },
 ];
@@ -41,7 +41,7 @@ const steps = [
 <Layout title="Relatinator · find related posts" active={null}>
   <section class="hero reveal" aria-labelledby="hero-title">
     <div class="hero-copy">
-      <p class="release-chip">relatinator 3.3 · MIT</p>
+      <p class="release-chip">relatinator 3.4 · MIT</p>
       <h1 id="hero-title">Find related posts when your site builds.</h1>
       <p class="lead">
         relatinator scores your documents against each other with BM25 or
