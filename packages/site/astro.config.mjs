@@ -10,7 +10,7 @@ import { graphiteTheme } from "./src/lib/shiki-theme.ts";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 export default defineConfig({
-  site: "https://relatinator.com",
+  site: "https://relatinator.darko.io",
   devToolbar: { enabled: false },
   redirects: { "/docs": "/docs/relatinator/" },
   markdown: {

@@ -65,11 +65,8 @@ const entries = [
     <meta name="description" content={description} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="https://relatinator.com/og.png" />
-    <meta
-      property="og:url"
-      content={`https://relatinator.com${Astro.url.pathname}`}
-    />
+    <meta property="og:image" content={new URL("/og.png", Astro.site).href} />
+    <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site).href} />
     <meta property="og:type" content="website" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />

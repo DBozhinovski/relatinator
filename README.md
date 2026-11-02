@@ -7,7 +7,7 @@ Relatinator finds related posts for your site. It scores your documents against 
 | [`relatinator`](packages/relatinator/README.md)             | The ranking library. It scores documents with BM25 (the default) or TF-IDF and runs in Node.js, browsers, and Cloudflare Workers. Its only dependency is a stemmer. |
 | [`astro-relatinator`](packages/astro-relatinator/README.md) | `getRelated()` finds related entries in an Astro content collection. `getEmDashRelated()` from `astro-relatinator/emdash` does the same for EmDash sites.           |
 | [`playground`](packages/playground/README.md)               | A private Astro site with six posts. Use it to check a change by hand.                                                                                              |
-| [`site`](packages/site/README.md)                           | The source of relatinator.com: the landing page, the demo, and the docs. The `Dockerfile` at the repository root builds it and serves it with nginx.                |
+| [`site`](packages/site/README.md)                           | The source of relatinator.darko.io: the landing page, the demo, and the docs. The `Dockerfile` at the repository root builds it and serves it with nginx.           |
 
 Version 3.0 changed the API of both libraries. If you upgrade from 2.x, read the "Migrating from 2.x" section in each library README. [docs/architecture.md](docs/architecture.md) has the design decisions, the checks behind them, and the known gaps.
 
@@ -69,7 +69,7 @@ To try a change in a real Astro site, use the playground. Its README lists the [
     │   ├── test/              Vitest tests and stubs for astro:content and emdash
     │   └── scripts/           The bundle step and the check of the sandbox entry
     ├── playground/            A private Astro 7 site with six posts
-    └── site/                  The relatinator.com site, with Playwright tests in e2e/
+    └── site/                  The relatinator.darko.io site, with Playwright tests in e2e/
 ```
 
 ---

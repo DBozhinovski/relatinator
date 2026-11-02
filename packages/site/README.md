@@ -1,6 +1,6 @@
 # Site
 
-This package holds the static Astro 7 site for relatinator.com: the landing page, the demo page, and the docs pages. `astro build` writes static files to `packages/site/dist`. The `Dockerfile` at the repository root serves those files with nginx.
+This package holds the static Astro 7 site for relatinator.darko.io: the landing page, the demo page, and the docs pages. `astro build` writes static files to `packages/site/dist`. The `Dockerfile` at the repository root serves those files with nginx.
 
 ## Develop
 
@@ -61,10 +61,10 @@ Facts about the image:
 
 ## Deploy on Coolify
 
-1. In Coolify, add a new resource of type Public Repository, or Private Repository with the GitHub app, and point it at `https://github.com/DBozhinovski/relatinator`, branch `main`.
+1. In Coolify, add a new resource of type Public Repository, or Private Repository with the GitHub app, and point it at `https://github.com/DBozhinovski/relatinator`, branch `master`.
 2. Set Build Pack to `Dockerfile`. Leave the Base Directory at `/` and the Dockerfile Location at `/Dockerfile`.
 3. Set Ports Exposes to `8080`.
-4. Set the domain to `https://relatinator.com`. Coolify issues the certificate.
+4. Set the domain to `https://relatinator.darko.io`. Coolify issues the certificate. The domain must match `site` in `astro.config.mjs`.
 5. Deploy. Coolify waits for the container's health check before it routes traffic.
 
 NOTE: The image is a static nginx server. It has no environment variables and no volumes.
