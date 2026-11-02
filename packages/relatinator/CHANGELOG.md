@@ -6,15 +6,15 @@ All notable changes to the "relatinator" project will be documented in this file
 
 This release adds `relatinator/llm`, an optional entry point that chooses topics with a language model. The main entry point does not change.
 
-`relatinator/llm` is experimental. It is not the final shape of the API. Its names, defaults, and scores can change in a minor release. Pin an exact version if you use it.
+`relatinator/llm` is experimental, and its API is not final. Its names, defaults, and scores can change in a minor release. If you use it, pin an exact version.
 
 - **New:** `classifyWithLLM(topics, text, { judge, minScore, limit })` chooses topics from a fixed list with a language model. The score is the log-odds of "yes" over "no". The defaults are `minScore: 0` and `limit: 2`.
-- **New:** `logprobJudge(endpoint)` reads the logprobs of a yes/no answer for each topic, after the `noul` question of [ruling](https://github.com/bradAGI/ruling). `jsonJudge(endpoint, { attempts })` asks for a probability for each topic, for endpoints without logprobs. It asks again when a reply has no JSON object.
+- **New:** `logprobJudge(endpoint)` asks a yes/no question for each topic and reads the logprobs of the answer. The question is based on the `noul` question of [ruling](https://github.com/bradAGI/ruling). `jsonJudge(endpoint, { attempts })` is for endpoints without logprobs. It asks for a probability for each topic, and it asks again when a reply has no JSON object.
 - **New:** `describeTopics(tags, posts, endpoint)` writes a description for each tag from the titles and summaries of the posts.
-- The endpoint is any OpenAI-compatible chat endpoint, local or hosted. `relatinator/llm` has no dependencies and uses `fetch`.
+- `relatinator/llm` works with any OpenAI-compatible chat endpoint, local or hosted. It has no dependencies. It uses `fetch`.
 - **Tooling:** `pnpm run eval` scores `classify()` or `classifyWithLLM()` against approved labels. The portability check now also bundles `dist/llm.js`.
 - **Docs:** The README has a new section, "Topics with a language model". `docs/architecture.md` has the eval results and a model-size comparison.
-- `classify()` and the model give the same results as in 3.3.0. The minified bundle of `dist/index.js` is 10153 bytes, and `dist/llm.js` is 3681 bytes.
+- `classify()`, `createModel()`, and the queries give the same results as in 3.3.0. The minified bundle of `dist/index.js` is 10153 bytes, and `dist/llm.js` is 3681 bytes.
 
 ## [3.3.0] - 2026-10-19
 

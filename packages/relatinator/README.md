@@ -1,9 +1,9 @@
 # Relatinator
 
-Relatinator finds related documents. It ranks documents with BM25 or TF-IDF. It can also choose topics for a text from a fixed list.
+Relatinator finds related documents. It scores your documents against each other with BM25 or TF-IDF, so you do not need a search service or an embedding model. It can also choose topics for a text from a fixed list.
 
-- It has one runtime dependency: a Porter2 stemmer.
-- All functions are synchronous and pure. The library keeps no global state except a bounded stem cache. This cache does not change any result.
+- Its only runtime dependency is a Porter2 stemmer.
+- The functions of the main entry point are synchronous and pure. The only global state is a bounded stem cache, and that cache never changes a result.
 
 ## Compatibility
 
@@ -42,7 +42,7 @@ model.explainRelated("cats", "both"); // [{ term: "cat", score: 0.49 }, { term: 
 model.getTopDocumentsForTerm("walking"); // ["dogs"]
 ```
 
-To choose topics from a fixed list, give each topic a tag and an optional description:
+To choose topics from a fixed list, give each topic a tag. A description is optional:
 
 ```ts
 import { classify } from "relatinator";
@@ -58,7 +58,7 @@ classify(topics, "How we built the meetup website with Astro and CSS");
 // [{ tag: "astro", score: 1 }, { tag: "community", score: 0.63 }, { tag: "frontend", score: 0.63 }]
 ```
 
-Each model is a separate value. To change the corpus, create a new model.
+A model does not change after you create it. To add or remove documents, create a new model.
 
 ## API
 
@@ -87,7 +87,7 @@ An empty array is valid. Every query on an empty model returns `[]`.
 | `findRelatedToTextScored(text, { limit, exclude, filter })` | Returns the result of `findRelatedToText` with the score of each id, as `{ id, score }`.                                       |
 | `explainRelated(id, otherId, limit)`                        | Returns the terms that give document `otherId` its score for the query `id`, as `{ term, score }`. Throws if an id is unknown. |
 
-The default `limit` is 5. The methods return results in rank order. [How scoring works](#how-scoring-works) gives the rules.
+The default `limit` is 5. The methods return results in rank order. [How scoring works](#how-scoring-works) explains the ranking.
 
 The four `find` methods have the same options:
 
@@ -97,18 +97,18 @@ The four `find` methods have the same options:
 | `exclude` | `readonly string[]`       | The ids to leave out of the results.                                   |
 | `filter`  | `(id: string) => boolean` | Keeps a document in the results only when the function returns `true`. |
 
-`exclude` and `filter` apply before `limit`. Thus the result has `limit` ids when enough other documents match. They do not change the weights, because the model keeps all documents. Without `exclude` and `filter`, the results are the same as in earlier 3.x versions.
+`exclude` and `filter` apply before `limit`, so you still get `limit` ids when enough other documents match. They do not change the weights, because the model keeps all documents. Without `exclude` and `filter`, the results are the same as in earlier 3.x versions.
 
 `getTopDocumentsForTerm` tokenizes `term` and uses the first token. If `term` has no token, for example because it is a stopword, the method returns `[]`.
 
 ### Scores and shared terms
 
-Use the scored methods and `explainRelated` to find why a document is in a related list, or to improve the text of your documents.
+The scored methods and `explainRelated` show why a document is in a related list. They also show which words to change when a related list looks wrong.
 
-- `findRelatedScored` and `findRelatedToTextScored` return the same ids, in the same order, as `findRelated` and `findRelatedToText` with the same options. Each `score` is the score that the model uses to rank the id. [How scoring works](#how-scoring-works) gives the formula. The scores are not normalized, so do not compare the scores of different queries.
-- `explainRelated(id, otherId)` returns the terms of document `id` that also occur in document `otherId`. The `score` of a term is the part of the score of `otherId` that the term gives. It is the number of times that the term occurs in document `id`, multiplied by the weight of the term in document `otherId`.
+- `findRelatedScored` and `findRelatedToTextScored` return the same ids, in the same order, as `findRelated` and `findRelatedToText` with the same options. Each `score` is the value that the model ranks the id by. [How scoring works](#how-scoring-works) gives the formula. The scores are not normalized, so do not compare the scores of different queries.
+- `explainRelated(id, otherId)` returns the terms of document `id` that also occur in document `otherId`. The `score` of a term is its part of the score of `otherId`. It is the count of the term in document `id`, multiplied by the weight of the term in document `otherId`.
 - `explainRelated` sorts the terms by score, highest first. Terms with equal scores are in JavaScript string order. The default `limit` is 5.
-- With `limit` set to `Infinity`, the sum of the term scores is the score of `otherId` for the query `id`. When the result of `findRelatedScored(id)` contains `otherId`, it gives the same score. The sum can be different in the last digits, because the order of the addition is different.
+- With `limit` set to `Infinity`, the term scores add up to the score of `otherId` for the query `id`. That is the same score that `findRelatedScored(id)` gives `otherId`. The last digits can be different, because the additions happen in a different order.
 - If the two documents share no term, `explainRelated` returns `[]`.
 - The terms are stems, as in `getTopTerms`.
 
@@ -120,7 +120,7 @@ Returns the terms that the model uses for `text`. [How scoring works](#how-scori
 tokenize("The cats aren't sleeping"); // ["cat", "sleep"]
 ```
 
-Terms are stems, not words. Thus `getTopTerms` and `explainRelated` can return `"exampl"` for "examples".
+Terms are stems, not words. For example, `getTopTerms` and `explainRelated` can return `"exampl"` for "examples".
 
 ### `classify(topics, text, options?)`
 
@@ -132,19 +132,19 @@ Chooses topics for `text` from a fixed list. Returns an array of `{ tag, score }
 
 The best topic has the score 1. If no topic shares a term with `text`, the result is `[]`. [How scoring works](#how-scoring-works) gives the rules.
 
-A topic without a description matches only through the words of its tag. The topic list controls most of the result. [Best practices for topic lists](#best-practices-for-topic-lists) tells you how to write it.
+A topic without a description can match only the words of its tag. The topic list decides most of the result, so write it with care. [Best practices for topic lists](#best-practices-for-topic-lists) shows how.
 
-The score is relative to the other topics for the same text, so do not compare scores of different texts. A BM25 score grows with the length of the text. Thus a fixed minimum score keeps too many topics for a long text and too few for a short one.
+Each score is relative to the other topics for the same text. Do not compare the scores of different texts. A BM25 score grows with the length of the text. For this reason, a fixed minimum score keeps too many topics for a long text and too few for a short one.
 
-`classify` does not read your tagged posts. It uses only the topic list. Thus it has the same cost for a new site and for a site with many posts.
+`classify` does not read your tagged posts. It reads only the topic list, so it costs the same on a new site as on a site with many posts.
 
 ## Topics with a language model
 
-> **Experimental.** `relatinator/llm` is not the final shape of this API. Names, defaults, and scores can change in a minor release. Pin an exact version if you use it, for example `"relatinator": "3.4.0"`.
+> **Experimental.** The `relatinator/llm` API is not final. Its names, defaults, and scores can change in a minor release. If you use it, pin an exact version, for example `"relatinator": "3.4.0"`.
 
-`relatinator/llm` chooses topics from the same list with a language model. It is optional. It has no dependencies, but it needs an OpenAI-compatible chat endpoint. The endpoint can be a local server, such as llama.cpp, or a hosted API with a key. Each post takes about 1 to 6 seconds, so use it at build time or in a script, not when a page renders.
+`relatinator/llm` is an optional entry point. It chooses topics from the same kind of topic list as `classify`, but it asks a language model instead of matching words. It has no dependencies. It needs an OpenAI-compatible chat endpoint, such as a local llama.cpp server or a hosted API with a key. The model takes about 1 to 6 seconds for each post. Run it at build time or in a script. It is too slow to run while a page renders.
 
-In a test with 37 blog posts, `classify` got an F1 of 0.68. A 4B model on a laptop GPU got 0.85 with the same topic list. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-language-model-as-an-option) gives the numbers.
+In a test with 37 blog posts, `classify` got an F1 of 0.68. A 4B model on a laptop GPU got 0.85 with the same topic list. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-language-model-as-an-option) has the full results.
 
 ```ts
 import { classifyWithLLM, describeTopics, logprobJudge } from "relatinator/llm";
@@ -172,52 +172,52 @@ Returns a promise of `{ tag, score }[]`, best first. `topics` follows the same r
 - `options.minScore` is the lowest score to keep (default `0`).
 - `options.limit` is the maximum number of topics (default `2`).
 
-The score is the log-odds of "yes" over "no". A score of 0 is even, and a positive score means that the topic applies. Unlike `classify`, the scores of different texts are comparable, and the result can be `[]`.
+The score is the log-odds of "yes" over "no". At 0, the model gives "yes" and "no" equal odds. A positive score means that the model thinks the topic applies. The scores of different texts are comparable, which is not true for `classify`. The result is `[]` when no topic reaches `minScore`.
 
 ### `logprobJudge(endpoint, options?)` and `jsonJudge(endpoint, options?)`
 
-- `logprobJudge` asks one yes/no question for each topic and reads the logprobs of the answer. It needs an endpoint that returns `top_logprobs`. llama.cpp and vLLM do. Many hosted models do not. It makes 2 requests for each topic, one at a time.
-- `jsonJudge` asks for a probability for each topic in one request. Use it when the endpoint gives no logprobs, for example a reasoning model.
-- `options.maxChars` is the number of characters of the text that the model reads (default `40000`). Make it smaller for a model with a small context.
+- `logprobJudge` asks a yes/no question for each topic and reads the logprobs of the answer. It needs an endpoint that returns `top_logprobs`. llama.cpp and vLLM return them, but many hosted models do not. It asks each question two times, with the answers in both orders. That is 2 requests for each topic, one at a time.
+- `jsonJudge` asks for a probability for each topic in one request. Use it when the endpoint gives no logprobs, for example with a reasoning model.
+- `options.maxChars` is the number of characters of the text that the model reads (default `40000`). Use a smaller value for a model with a small context.
 
 `endpoint` is a `ChatEndpoint`:
 
 - `baseURL`: the URL with the version path, for example `http://127.0.0.1:8080/v1`.
 - `model`: the model name.
-- `apiKey`: optional. It is sent as `Authorization: Bearer <apiKey>`.
+- `apiKey`: optional. Relatinator sends it as `Authorization: Bearer <apiKey>`.
 - `headers`: optional extra request headers.
 - `body`: optional extra fields for the request body.
 - `fetch`: optional replacement for the global `fetch`.
 
-A failed request throws an error with the status. `jsonJudge` asks again when a reply has no JSON object, up to `options.attempts` requests (default `3`). Some reasoning models sometimes send an empty reply.
+If a request fails, the function throws an error with the HTTP status. Some reasoning models sometimes send an empty reply. For this reason, `jsonJudge` asks again when a reply has no JSON object, up to `options.attempts` requests (default `3`).
 
 ### `describeTopics(tags, posts, endpoint)`
 
-Writes one description for each tag from the titles and summaries of your posts. `posts` is an array of `{ title: string; summary?: string }`. Returns a promise of `Topic[]` in the order of `tags`. If the model gives no description for a tag, it throws an error with the missing tags. Read and edit the descriptions before you use them.
+Writes one description for each tag from the titles and summaries of your posts. `posts` is an array of `{ title: string; summary?: string }`. Returns a promise of `Topic[]` in the order of `tags`. If the model gives no description for a tag, it throws an error that names the missing tags. Read and edit the descriptions before you use them.
 
 ### Choose a model
 
-- **Size.** Use a model with about 2B parameters or more. In the test, models under 1B did not do better than `classify`. Qwen3 4B Instruct (Q4_K_M, 2.5 GB) was the best local model. Gemma 4 E2B was the smallest model close to it.
-- **llama.cpp.** Add `body: { cache_prompt: true }`. The server then reads the post one time for all the questions about it. For Qwen3.5 models, also add `chat_template_kwargs: { enable_thinking: false }`. Then the first token is the answer.
-- **`minScore`.** The best cut changes with the model. Start at 0. If you get too many topics, increase it. `pnpm --filter relatinator eval` shows the best cut for labels that you approved.
-- **Descriptions.** The descriptions are still the largest lever. Descriptions from `describeTopics` gave 0.10 to 0.14 more F1 than descriptions from the tag names only.
+- Use a model with about 2B parameters or more. In the test, models under 1B did no better than `classify`. Qwen3 4B Instruct (Q4_K_M, 2.5 GB) was the best local model. Gemma 4 E2B was the smallest model that came close to it.
+- With llama.cpp, add `body: { cache_prompt: true }`. The server then reads the post one time for all the questions about it. For Qwen3.5 models, also add `chat_template_kwargs: { enable_thinking: false }`, so that the first token is the answer.
+- Start with `minScore` at 0. The best threshold is different for each model. If you get too many topics, increase it. `pnpm --filter relatinator eval` shows the best threshold for labels that you approved.
+- The descriptions still matter most. Descriptions from `describeTopics` gave 0.10 to 0.14 more F1 than descriptions made from the tag names only.
 
 ## Best practices for topic lists
 
-`classify` matches words, not meanings. Thus the words in your topic list control most of the result. In a test with 38 blog posts, specific descriptions gave much better results than short, general ones. The code and the posts were the same. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-fixed-list-scored-by-their-descriptions) gives the numbers.
+`classify` matches words. It does not know what they mean, so the words in your topic list decide most of the result. In a test with 38 blog posts, specific descriptions did much better than short, general ones, with the same code and the same posts. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-fixed-list-scored-by-their-descriptions) has the numbers.
 
 ### Write the descriptions
 
-- **Name the specific things that your posts mention.** Use the names of projects, tools, products, events, and places. For example, write "self-hosting with Coolify and Hetzner, serverless functions, edge computing". Do not write only "hosting".
+- **Name the specific things that your posts mention.** Use the names of projects, tools, products, events, and places. For example, write "self-hosting with Coolify and Hetzner, serverless functions, edge computing" instead of only "hosting".
 - **Use the words of your posts.** `classify` matches "PWA" to "PWA", but not to "progressive web app". If your posts use both forms, put both in the description.
-- **Write 10 to 25 words for each topic.** Keep the descriptions at a similar length. A topic with a much longer text matches more posts.
-- **Leave out the words that most of your posts contain.** For example, "JavaScript" in one description on a JavaScript blog makes that topic match almost every post.
+- **Write 10 to 25 words for each topic.** Keep the descriptions at a similar length, because a topic with a much longer text matches more posts.
+- **Leave out the words that most of your posts contain.** On a JavaScript blog, for example, "JavaScript" in one description makes that topic match almost every post.
 
 ### Choose the topics
 
-- **Make each topic group several posts.** Three separate topic lists for one blog with 38 posts had 11 to 14 topics.
-- **Do not make a topic that fits almost every post.** For example, "web development" on a web development blog groups nothing. Its words also match every text.
-- **Make the topics different from each other.** If two topics share most of their words, `classify` gives them together. Merge them, or keep only the words that make them different.
+- **Make each topic group several posts.** In the test, three different topic lists for one blog with 38 posts had 11 to 14 topics each.
+- **Do not make a topic that fits almost every post.** On a web development blog, a "web development" topic groups nothing, and its words match every text.
+- **Make the topics different from each other.** If two topics share most of their words, `classify` returns them together. Merge them, or keep only the words that make them different.
 
 ### Check the result
 
@@ -227,7 +227,7 @@ Writes one description for each tag from the titles and summaries of your posts.
 4. If a topic is missing from a post, add a word from that post to the description.
 5. Do steps 1 to 4 again until most posts get the correct topics.
 
-To get fewer topics with more correct ones, increase `ratio`. In the test, `ratio` 0.7 kept about 75% correct topics and found about 60% of the correct topics. `ratio` 0.5 gave about 70% for both.
+To get fewer topics, with a larger share of correct ones, increase `ratio`. In the test, with `ratio` 0.7, about 75% of the topics were correct, and the results had about 60% of the correct topics. With `ratio` 0.5, both numbers were about 70%.
 
 ### Start with no tags
 
@@ -257,7 +257,7 @@ The model scores documents in four steps.
    - TF-IDF: `idf(t) = 1 + ln(N / (1 + df(t)))`. The weight is `tf · idf(t)`.
    - BM25: `idf(t) = ln(1 + (N − df(t) + 0.5) / (df(t) + 0.5))`. The weight is `idf(t) · tf · (k1 + 1) / (tf + k1 · (1 − b + b · |d| / avgdl))`.
 3. **Score the documents.** The score of a document is the sum of the weights of the query terms in that document. A term that occurs two times in the query counts two times. `findRelated(id)` uses the terms of document `id` as the query. `findRelatedToText(text)` uses `tokenize(text)`.
-4. **Rank.** The model removes the query document, the ids in `exclude`, and the ids that `filter` does not keep. It also removes each document with a score of 0. A document that shares no term with the query has a score of 0. It sorts the other documents by score, highest first. Documents with equal scores keep their input order. The result is the first `limit` ids.
+4. **Rank.** The model removes the query document, the ids in `exclude`, and the ids that `filter` does not keep. It also removes each document with a score of 0. A document has a score of 0 when it shares no term with the query. It sorts the other documents by score, highest first. Documents with equal scores keep their input order. The result is the first `limit` ids.
 
 `getTopTerms` sorts the terms of a document by weight, highest first. Terms with equal weights are in JavaScript string order.
 
@@ -265,7 +265,7 @@ The model scores documents in four steps.
 
 1. The documents are the topics. The text of a topic is its tag, followed by its description if there is one. The id is the tag.
 2. The query is `tokenize(text)`.
-3. It divides the score of each topic by the best score. Thus the best topic has the score 1.
+3. It divides the score of each topic by the best score, so the best topic has the score 1.
 4. It removes each topic with a score of 0 or a score below `ratio`. It sorts the other topics as in step 4. The result is the first `limit` topics, as `{ tag, score }`.
 
 ## Migrating from 2.x
@@ -280,11 +280,11 @@ Version 3.0 changes the API.
 - Results do not include documents with a score of 0.
 - Version 3.0 removes the `debug` parameter. The library does not write to the console.
 - Duplicate document ids throw an error.
-- Scores can change a little. The library now has its own tokenizer, TF-IDF, and BM25 code.
+- Scores can change a little, because the library now has its own tokenizer, TF-IDF, and BM25 code.
 
 ## Development
 
-This package is part of a pnpm workspace. For the workspace commands, read [Development](https://github.com/DBozhinovski/relatinator#development) in the repository README. For the design decisions and the verification, read [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md).
+This package is part of a pnpm workspace. For the workspace commands, read [Development](https://github.com/DBozhinovski/relatinator#development) in the repository README. For the design decisions and the checks behind them, read [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md).
 
 Run these commands from the repository root:
 
@@ -297,7 +297,7 @@ Run these commands from the repository root:
 | `pnpm --filter relatinator format:check`     | Checks the format with Prettier. `format` writes the changes.                                                                                                                                                                                                                                                                                                            |
 | `pnpm --filter relatinator bench`            | Builds the package. Then it times `createModel()`, the queries, and `tokenize()` on synthetic posts. Each run starts a new Node.js process. `--impl both` also times `relatinator` 3.0.0 and compares the checksums of the outputs. `--sizes` sets the numbers of posts, as a comma-separated list (default `200,1005`). `--runs` sets the number of runs (default `5`). |
 
-The `prepack` script runs `build`. Thus `pnpm pack` and `pnpm publish` always include a new build.
+The `prepack` script runs `build`, so `pnpm pack` and `pnpm publish` always include a new build.
 
 ## License
 

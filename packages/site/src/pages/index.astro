@@ -14,7 +14,7 @@ const features = [
   },
   {
     title: "Topics from a fixed list",
-    body: "classify(topics, text) matches text against topic descriptions you write. You don't train anything or ship a model file, and the text never leaves your process. Want a language model to judge instead? Try the experimental relatinator/llm.",
+    body: "classify(topics, text) matches text against topic descriptions you write. You don't train anything or ship a model file, and the text never leaves your process. To have a language model pick the topics, use the experimental relatinator/llm entry point.",
     code: 'const topics = [{ tag: "space", description }];\nconst best = classify(topics, text);',
   },
 ];
