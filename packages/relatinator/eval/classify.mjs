@@ -2,7 +2,7 @@
 // Run `pnpm run build` first. See "LLM topics" in docs/architecture.md.
 //
 // node eval/classify.mjs --posts posts.json --labels labels.json --topics topics.json \
-//   [--judge bm25|logprob|json] [--base-url URL] [--model NAME] [--api-key-env VAR] \
+//   [--judge bm25|logprob|json|embed] [--base-url URL] [--model NAME] [--api-key-env VAR] \
 //   [--body JSON] [--headers JSON] [--cache DIR] [--limit 2] [--min-score 0]
 //
 // posts.json: [{ id, title, description, body }]
@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { classify } from "../dist/index.js";
-import { jsonJudge, logprobJudge } from "../dist/llm.js";
+import { embedJudge, jsonJudge, logprobJudge } from "../dist/llm.js";
 
 const { values: args } = parseArgs({
   options: {
@@ -47,6 +47,7 @@ function makeJudge() {
     headers: JSON.parse(args.headers),
   };
   if (args.judge === "json") return jsonJudge(endpoint);
+  if (args.judge === "embed") return embedJudge(endpoint);
   if (args.judge === "logprob") return logprobJudge(endpoint);
   throw new Error(`Unknown judge: ${args.judge}`);
 }

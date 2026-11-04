@@ -173,7 +173,7 @@ Do not read the field that already holds the tags of the entry. Without `fields`
 
 `classify()` does not read the collection, and it does not use the model cache of `getRelated()`. It only compares the text with the topic list.
 
-To let a language model choose topics at build time, give this text to `classifyWithLLM()` from the experimental `relatinator/llm` entry point. It needs `relatinator` 3.4 or later and a chat endpoint. [Topics with a language model](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#topics-with-a-language-model) has the details.
+To let a language model choose topics at build time, give this text to `classifyWithLLM()` from the experimental `relatinator/llm` entry point. It needs `relatinator` 3.4 or later and a chat endpoint. For the embedding judge, `embedJudge()`, it needs `relatinator` 3.5 or later and an embedding endpoint. [Topics with a language model](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#topics-with-a-language-model) has the details.
 
 Most of the result depends on the topic list. [Best practices for topic lists](https://github.com/DBozhinovski/relatinator/tree/master/packages/relatinator#best-practices-for-topic-lists) shows how to write a good one.
 

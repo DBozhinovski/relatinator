@@ -9,7 +9,7 @@ import { checkTopicTags } from "./classify.js";
 import type { ScoredTopic, Topic } from "./index.js";
 
 /**
- * The part of `fetch` that the chat requests use.
+ * The part of `fetch` that the requests use.
  * @experimental
  */
 export type FetchLike = (
@@ -23,10 +23,11 @@ export type FetchLike = (
 }>;
 
 /**
- * An OpenAI-compatible chat endpoint: a local server or a hosted API.
+ * An OpenAI-compatible endpoint: a local server or a hosted API. The judges
+ * send chat requests or embedding requests to it.
  * @experimental
  */
-export interface ChatEndpoint {
+export interface Endpoint {
   /** The base URL with the version path, for example `http://127.0.0.1:8080/v1`. */
   baseURL: string;
   model: string;
@@ -34,15 +35,23 @@ export interface ChatEndpoint {
   apiKey?: string;
   /** More request headers, for example a session header that a provider needs. */
   headers?: Record<string, string>;
-  /** More fields for the request body, for example `chat_template_kwargs`. */
+  /** More fields for the request body, for example `chat_template_kwargs` or `dimensions`. */
   body?: Record<string, unknown>;
   /** A replacement for the global `fetch`. */
   fetch?: FetchLike;
 }
 
 /**
- * Scores each topic for a text. The score is the log-odds of "yes" over "no":
- * 0 means even, a positive score means the topic applies.
+ * The name of `Endpoint` in 3.4.0.
+ * @deprecated Use `Endpoint`.
+ * @experimental
+ */
+export type ChatEndpoint = Endpoint;
+
+/**
+ * Scores each topic for a text. 0 is the cut: a positive score means that the
+ * topic applies. The chat judges give the log-odds of "yes" over "no".
+ * `embedJudge` gives the cosine above the mean of the topics, minus its cut.
  * @experimental
  */
 export type TopicJudge = (
@@ -94,11 +103,12 @@ interface ChatResponse {
   }[];
 }
 
-async function chat(
-  endpoint: ChatEndpoint,
-  messages: ChatMessage[],
-  fields: Record<string, unknown>
-): Promise<ChatResponse> {
+async function request(
+  endpoint: Endpoint,
+  path: string,
+  fields: Record<string, unknown>,
+  kind: "Chat" | "Embedding"
+): Promise<unknown> {
   const {
     baseURL,
     model,
@@ -107,20 +117,33 @@ async function chat(
     body,
     fetch: run = (globalThis as unknown as { fetch: FetchLike }).fetch,
   } = endpoint;
-  const response = await run(`${baseURL.replace(/\/$/, "")}/chat/completions`, {
+  const response = await run(`${baseURL.replace(/\/$/, "")}/${path}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       ...headers,
     },
-    body: JSON.stringify({ model, messages, ...fields, ...body }),
+    body: JSON.stringify({ model, ...fields, ...body }),
   });
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 300);
-    throw new Error(`Chat request failed: ${response.status} ${detail}`);
+    throw new Error(`${kind} request failed: ${response.status} ${detail}`);
   }
-  return (await response.json()) as ChatResponse;
+  return response.json();
+}
+
+async function chat(
+  endpoint: Endpoint,
+  messages: ChatMessage[],
+  fields: Record<string, unknown>
+): Promise<ChatResponse> {
+  return (await request(
+    endpoint,
+    "chat/completions",
+    { messages, ...fields },
+    "Chat"
+  )) as ChatResponse;
 }
 
 function letterLogprob(top: readonly TopLogprob[], letter: string): number {
@@ -139,7 +162,7 @@ function letterLogprob(top: readonly TopLogprob[], letter: string): number {
  * @experimental
  */
 export function logprobJudge(
-  endpoint: ChatEndpoint,
+  endpoint: Endpoint,
   { maxChars = DEFAULT_MAX_CHARS }: JudgeOptions = {}
 ): TopicJudge {
   async function margin(post: string, topic: Topic, yesFirst: boolean) {
@@ -163,7 +186,7 @@ export function logprobJudge(
   }
 
   return async (text, topics) => {
-    const post = text.slice(0, maxChars);
+    const post = head(text, maxChars);
     const scores: number[] = [];
     for (const topic of topics) {
       const first = await margin(post, topic, true);
@@ -205,7 +228,7 @@ export interface JsonJudgeOptions extends JudgeOptions {
  * @experimental
  */
 export function jsonJudge(
-  endpoint: ChatEndpoint,
+  endpoint: Endpoint,
   { maxChars = DEFAULT_MAX_CHARS, attempts = 3 }: JsonJudgeOptions = {}
 ): TopicJudge {
   const system =
@@ -223,7 +246,7 @@ export function jsonJudge(
       { role: "system", content: system },
       {
         role: "user",
-        content: `Topics:\n${list}\n\nPost:\n${text.slice(0, maxChars)}`,
+        content: `Topics:\n${list}\n\nPost:\n${head(text, maxChars)}`,
       },
     ];
     let error: unknown;
@@ -242,6 +265,124 @@ export function jsonJudge(
       }
     }
     throw error;
+  };
+}
+
+/** @experimental */
+export interface EmbedJudgeOptions extends JudgeOptions {
+  /** The amount by which a cosine must exceed the mean of the topics. The default is 0.04. */
+  cut?: number;
+  /** Makes the model input for a topic. The default is the EmbeddingGemma 2 search query. */
+  topicInput?: (topic: Topic) => string;
+  /** Makes the model input for the text. The default is the EmbeddingGemma 2 document format. */
+  textInput?: (text: string) => string;
+}
+
+function unitVector(vector: unknown): number[] {
+  const valid =
+    Array.isArray(vector) &&
+    vector.length > 0 &&
+    vector.every((x) => typeof x === "number" && Number.isFinite(x));
+  const length = valid ? Math.sqrt(vector.reduce((s, x) => s + x * x, 0)) : 0;
+  if (!(length > 0)) {
+    throw new Error("The embedding response has a vector that is not usable.");
+  }
+  return (vector as number[]).map((x) => x / length);
+}
+
+/** Puts each vector of the response at its `index`, or at its position when it has no index. */
+function readVectors(response: unknown, count: number): number[][] {
+  const data =
+    response && typeof response === "object" && "data" in response
+      ? response.data
+      : undefined;
+  const items: unknown[] = Array.isArray(data) ? data : [];
+  if (items.length !== count) {
+    throw new Error(
+      `The embedding response has ${items.length} vectors for ${count} inputs.`
+    );
+  }
+  // Each index is unique and from 0 to count - 1, so every input gets a vector.
+  const vectors: number[][] = [];
+  items.forEach((item, position) => {
+    const fields = item && typeof item === "object" ? item : {};
+    const index = "index" in fields ? fields.index : position;
+    const usable =
+      typeof index === "number" &&
+      Number.isInteger(index) &&
+      index >= 0 &&
+      index < count &&
+      vectors[index] === undefined;
+    if (!usable) {
+      throw new Error(`The embedding response has a wrong index: ${index}.`);
+    }
+    vectors[index] = unitVector(
+      "embedding" in fields ? fields.embedding : undefined
+    );
+  });
+  return vectors;
+}
+
+async function embed(endpoint: Endpoint, input: string[]): Promise<number[][]> {
+  const fields = { input, encoding_format: "float" };
+  const response = await request(endpoint, "embeddings", fields, "Embedding");
+  return readVectors(response, input.length);
+}
+
+function cosine(a: readonly number[], b: readonly number[]): number {
+  if (a.length !== b.length) {
+    throw new Error(
+      `The embedding vectors have different lengths: ${a.length} and ${b.length}.`
+    );
+  }
+  return a.reduce((sum, x, i) => sum + x * b[i], 0);
+}
+
+/** Cuts the text, but not between the two halves of a surrogate pair. */
+function head(text: string, maxChars: number): string {
+  const last = text.charCodeAt(maxChars - 1);
+  return text.slice(
+    0,
+    last >= 0xd800 && last <= 0xdbff ? maxChars - 1 : maxChars
+  );
+}
+
+/**
+ * Embeds the text and each topic, and compares them by cosine. The score is
+ * the cosine minus the mean cosine of all the topics, minus `cut`. Give it
+ * the full topic list: with one topic, the score is always `-cut`. The judge
+ * keeps the topic vectors, so each later text needs one request. It reads the
+ * first `maxChars` characters of the text (default 2000). The default inputs
+ * are the EmbeddingGemma 2 formats. Change them for other models.
+ * @experimental
+ */
+export function embedJudge(
+  endpoint: Endpoint,
+  {
+    maxChars = 2000,
+    cut = 0.04,
+    topicInput = ({ tag, description }) =>
+      `task: search result | query: ${tag}${description ? `: ${description}` : ""}`,
+    textInput = (text) => `title: none | text: ${text}`,
+  }: EmbedJudgeOptions = {}
+): TopicJudge {
+  if (typeof cut !== "number" || !Number.isFinite(cut)) {
+    throw new RangeError(`Invalid cut: ${cut}. Use a finite number.`);
+  }
+  const topicVectors = new Map<string, number[]>();
+  return async (text, topics) => {
+    const inputs = topics.map(topicInput);
+    const missing = [...new Set(inputs)].filter((i) => !topicVectors.has(i));
+    const [textVector, ...vectors] = await embed(endpoint, [
+      textInput(head(text, maxChars)),
+      ...missing,
+    ]);
+    missing.forEach((input, i) => topicVectors.set(input, vectors[i]));
+    const cosines = inputs.map((input) =>
+      cosine(topicVectors.get(input) as number[], textVector)
+    );
+    const mean = cosines.reduce((sum, c) => sum + c, 0) / cosines.length;
+    return cosines.map((c) => c - mean - cut);
   };
 }
 
@@ -277,7 +418,7 @@ export async function classifyWithLLM(
 export async function describeTopics(
   tags: readonly string[],
   posts: readonly DescribePost[],
-  endpoint: ChatEndpoint
+  endpoint: Endpoint
 ): Promise<Topic[]> {
   const prompt =
     `These are the topic tags of a blog: ${tags.join(", ")}.\n` +

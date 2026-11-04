@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   classifyWithLLM,
   describeTopics,
+  embedJudge,
   jsonJudge,
   logprobJudge,
-  type ChatEndpoint,
+  type Endpoint,
   type TopicJudge,
 } from "../src/llm.js";
 
@@ -20,7 +21,7 @@ interface Sent {
 
 function fakeEndpoint(reply: (sent: Sent) => unknown, status = 200) {
   const sent: Sent[] = [];
-  const endpoint: ChatEndpoint = {
+  const endpoint: Endpoint = {
     baseURL: "http://model.test/v1/",
     model: "small",
     fetch: async (url, init) => {
@@ -159,6 +160,17 @@ describe("jsonJudge", () => {
     expect(await jsonJudge(endpoint)("text", topics)).toEqual([-30, -30]);
   });
 
+  it("does not cut a surrogate pair in half", async () => {
+    const { endpoint, sent } = fakeEndpoint(() => content('{"astro": 1}'));
+    await jsonJudge(endpoint, { maxChars: 2 })("a\u{1F600}b", [topics[1]]);
+    expect(sent[0].body.messages[1].content).toMatch(/Post:\na$/);
+    const logprob = fakeEndpoint(() => letters(0, -1));
+    await logprobJudge(logprob.endpoint, { maxChars: 2 })("a\u{1F600}", [
+      topics[1],
+    ]);
+    expect(logprob.sent[0].body.messages[1].content).toContain("Post:\na\n\n");
+  });
+
   it("asks again when a reply has no JSON object", async () => {
     const replies = [content(""), content('{"community": 1, "astro": 0}')];
     const { endpoint, sent } = fakeEndpoint(() => replies[sent.length - 1]);
@@ -176,6 +188,193 @@ describe("jsonJudge", () => {
       jsonJudge(endpoint, { attempts: 1 })("text", topics)
     ).rejects.toThrow("did not reply with a JSON object");
     expect(sent).toHaveLength(4);
+  });
+});
+
+describe("embedJudge", () => {
+  const COMMUNITY = "task: search result | query: community: meetups, BeerJS";
+  const ASTRO = "task: search result | query: astro";
+  const three = [...topics, { tag: "career" }];
+  const CAREER = "task: search result | query: career";
+  // The server sends the vectors in reverse order, not unit length.
+  function vectors(table: Record<string, number[]>) {
+    return fakeEndpoint((sent) => ({
+      data: (sent.body.input as string[])
+        .map((input, index) => ({ index, embedding: table[input] }))
+        .reverse(),
+    }));
+  }
+  const table = {
+    "title: none | text: Notes from a meetup": [3, 0],
+    [COMMUNITY]: [2, 0],
+    [ASTRO]: [0, 5],
+    [CAREER]: [3, 4],
+  };
+
+  it("scores the cosine above the mean of the topics, minus the cut", async () => {
+    const { endpoint, sent } = vectors(table);
+    const scores = await embedJudge(endpoint)("Notes from a meetup", three);
+    // Cosines 1, 0 and 0.6, so the mean is 0.533.
+    expect(scores[0]).toBeCloseTo(1 - 1.6 / 3 - 0.04);
+    expect(scores[1]).toBeCloseTo(0 - 1.6 / 3 - 0.04);
+    expect(scores[2]).toBeCloseTo(0.6 - 1.6 / 3 - 0.04);
+    expect(sent[0].url).toBe("http://model.test/v1/embeddings");
+    expect(sent[0].body).toEqual({
+      model: "small",
+      input: [
+        "title: none | text: Notes from a meetup",
+        COMMUNITY,
+        ASTRO,
+        CAREER,
+      ],
+      encoding_format: "float",
+    });
+  });
+
+  it("embeds each topic one time for all the texts", async () => {
+    const { endpoint, sent } = vectors(table);
+    const judge = embedJudge(endpoint, { cut: 0 });
+    await judge("Notes from a meetup", three);
+    const again = await judge("Notes from a meetup", [three[2], three[0]]);
+    expect(sent[1].body.input).toEqual([
+      "title: none | text: Notes from a meetup",
+    ]);
+    expect(again[0]).toBeCloseTo(-0.2);
+    expect(again[1]).toBeCloseTo(0.2);
+  });
+
+  it("uses the given inputs, the key, and maxChars", async () => {
+    const { endpoint, sent } = vectors({
+      "doc: ab": [1, 0],
+      "q: astro": [0, 1],
+    });
+    await embedJudge(
+      { ...endpoint, apiKey: "secret", body: { dimensions: 256 } },
+      {
+        maxChars: 2,
+        topicInput: (topic) => `q: ${topic.tag}`,
+        textInput: (text) => `doc: ${text}`,
+      }
+    )("abc", [topics[1]]);
+    expect(sent[0].headers.authorization).toBe("Bearer secret");
+    expect(sent[0].body.input).toEqual(["doc: ab", "q: astro"]);
+    expect(sent[0].body.dimensions).toBe(256);
+  });
+
+  it("does not cut a surrogate pair in half", async () => {
+    const { endpoint, sent } = vectors({
+      "title: none | text: a": [1, 0],
+      [ASTRO]: [0, 1],
+    });
+    await embedJudge(endpoint, { maxChars: 2 })("a\u{1F600}b", [topics[1]]);
+    expect(sent[0].body.input).toEqual(["title: none | text: a", ASTRO]);
+  });
+
+  it("throws for a failed request or a response that does not fit", async () => {
+    const failed = fakeEndpoint(() => ({ error: "expired" }), 401);
+    await expect(embedJudge(failed.endpoint)("t", topics)).rejects.toThrow(
+      'Embedding request failed: 401 {"error":"expired"}'
+    );
+    const short = fakeEndpoint(() => ({
+      data: [{ index: 0, embedding: [1] }],
+    }));
+    await expect(embedJudge(short.endpoint)("t", topics)).rejects.toThrow(
+      "1 vectors for 3 inputs"
+    );
+    for (const embedding of [
+      [0, 0],
+      [1, Number.NaN],
+      [1, Infinity],
+      "1,0",
+      [],
+    ]) {
+      const bad = fakeEndpoint(() => ({ data: [{ index: 0, embedding }] }));
+      await expect(embedJudge(bad.endpoint)("t", [])).rejects.toThrow(
+        "a vector that is not usable"
+      );
+    }
+    const noData = fakeEndpoint(() => ({ data: "none" }));
+    await expect(embedJudge(noData.endpoint)("t", [])).rejects.toThrow(
+      "0 vectors for 1 inputs"
+    );
+  });
+
+  it("throws for an index that repeats or is out of range", async () => {
+    for (const indexes of [
+      [0, 0],
+      [0, 2],
+      [-1, 0],
+      [0, "1"],
+    ]) {
+      const { endpoint } = fakeEndpoint(() => ({
+        data: indexes.map((index) => ({ index, embedding: [1, 0] })),
+      }));
+      await expect(embedJudge(endpoint)("t", [topics[1]])).rejects.toThrow(
+        "a wrong index"
+      );
+    }
+  });
+
+  it("uses the position of a vector that has no index", async () => {
+    const { endpoint } = fakeEndpoint(() => ({
+      data: [
+        { embedding: [1, 0] },
+        { embedding: [1, 0] },
+        { embedding: [0, 1] },
+      ],
+    }));
+    const scores = await embedJudge(endpoint, { cut: 0 })("t", topics);
+    expect(scores[0]).toBeCloseTo(0.5);
+    expect(scores[1]).toBeCloseTo(-0.5);
+  });
+
+  it("throws for vectors of different lengths, also from the cache", async () => {
+    const mixed = vectors({
+      "title: none | text: t": [1, 0],
+      [ASTRO]: [1, 0, 0],
+    });
+    await expect(embedJudge(mixed.endpoint)("t", [topics[1]])).rejects.toThrow(
+      "different lengths: 3 and 2"
+    );
+    const replies = [
+      {
+        data: [
+          { index: 0, embedding: [1, 0] },
+          { index: 1, embedding: [0, 1] },
+        ],
+      },
+      { data: [{ index: 0, embedding: [1, 0, 0] }] },
+    ];
+    let call = 0;
+    const cached = fakeEndpoint(() => replies[call++]);
+    const judge = embedJudge(cached.endpoint);
+    await judge("t", [topics[1]]);
+    await expect(judge("t", [topics[1]])).rejects.toThrow("different lengths");
+  });
+
+  it("gives -cut to a single topic", async () => {
+    const { endpoint } = vectors(table);
+    const [score] = await embedJudge(endpoint, { cut: 0.1 })(
+      "Notes from a meetup",
+      [topics[0]]
+    );
+    expect(score).toBeCloseTo(-0.1);
+  });
+
+  it("throws a RangeError for a cut that is not a finite number", () => {
+    const { endpoint } = vectors(table);
+    for (const cut of [Number.NaN, Infinity]) {
+      expect(() => embedJudge(endpoint, { cut })).toThrow(RangeError);
+    }
+  });
+
+  it("works with classifyWithLLM and its default minScore", async () => {
+    const { endpoint } = vectors(table);
+    const judge = embedJudge(endpoint);
+    const result = await classifyWithLLM(three, "Notes from a meetup", {
+      judge,
+    });
+    expect(result.map((t) => t.tag)).toEqual(["community", "career"]);
   });
 });
 

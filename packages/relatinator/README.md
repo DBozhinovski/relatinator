@@ -142,37 +142,57 @@ Each score is relative to the other topics for the same text. Do not compare the
 
 > **Experimental.** The `relatinator/llm` API is not final. Its names, defaults, and scores can change in a minor release. If you use it, pin an exact version, for example `"relatinator": "3.4.0"`.
 
-`relatinator/llm` is an optional entry point. It chooses topics from the same kind of topic list as `classify`, but it asks a language model instead of matching words. It has no dependencies. It needs an OpenAI-compatible chat endpoint, such as a local llama.cpp server or a hosted API with a key. The model takes about 1 to 6 seconds for each post. Run it at build time or in a script. It is too slow to run while a page renders.
+`relatinator/llm` is an optional entry point. It chooses topics from the same kind of topic list as `classify`, but it uses a language model instead of matching words. It has no dependencies. It needs an OpenAI-compatible endpoint, such as a local llama.cpp server or a hosted API with a key. Run it at build time or in a script.
 
-In a test with 37 blog posts, `classify` got an F1 of 0.68. A 4B model on a laptop GPU got 0.85 with the same topic list. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-language-model-as-an-option) has the full results.
+It has two kinds of judge:
+
+- **A chat judge**, `logprobJudge` or `jsonJudge`, asks a chat model about each topic. It gives the best results, but it needs a model of about 2B parameters or more. That model takes about 1 to 6 seconds for each post.
+- **The embedding judge**, `embedJudge`, compares a vector of the post with a vector of each topic. EmbeddingGemma 2 needs 176 MB and one request for each post. It took less than 0.1 seconds for each post on a laptop GPU. It needs good topic descriptions.
+
+In a test with 37 blog posts and descriptions from `describeTopics`, `classify` got an F1 of 0.68. EmbeddingGemma 2 with `embedJudge` got 0.83. Qwen3 4B with `logprobJudge` got 0.85. [docs/architecture.md](https://github.com/DBozhinovski/relatinator/blob/master/docs/architecture.md#topics-from-a-language-model-as-an-option) has the full results.
 
 ```ts
-import { classifyWithLLM, describeTopics, logprobJudge } from "relatinator/llm";
+import {
+  classifyWithLLM,
+  describeTopics,
+  embedJudge,
+  logprobJudge,
+} from "relatinator/llm";
 
-const endpoint = { baseURL: "http://127.0.0.1:8080/v1", model: "qwen3-4b" };
+// A local llama.cpp server. For a hosted API, also set `apiKey`.
+const chat = { baseURL: "http://127.0.0.1:8080/v1", model: "qwen3-4b" };
 
 // One time: write a description for each tag from your posts.
 const topics = await describeTopics(
   ["community", "astro", "career"],
   posts.map((p) => ({ title: p.title, summary: p.description })),
-  endpoint
+  chat
 );
 
-// For each post:
-const judge = logprobJudge(endpoint);
-await classifyWithLLM(topics, post.body, { judge });
+// For each post, with a chat model:
+await classifyWithLLM(topics, post.body, { judge: logprobJudge(chat) });
 // [{ tag: "community", score: 18.2 }]
+
+// Or with an embedding model. Make one judge for all the posts.
+const judge = embedJudge({
+  baseURL: "http://127.0.0.1:8081/v1",
+  model: "embeddinggemma-2",
+});
+await classifyWithLLM(topics, post.body, { judge });
+// [{ tag: "community", score: 0.05 }]
 ```
 
 ### `classifyWithLLM(topics, text, options)`
 
 Returns a promise of `{ tag, score }[]`, best first. `topics` follows the same rules as in `classify`.
 
-- `options.judge` is a `TopicJudge`, for example `logprobJudge(endpoint)` or `jsonJudge(endpoint)`. A judge is a function `(text, topics) => Promise<number[]>`.
+- `options.judge` is a `TopicJudge`, for example `logprobJudge(endpoint)`, `jsonJudge(endpoint)`, or `embedJudge(endpoint)`. A judge is a function `(text, topics) => Promise<number[]>`.
 - `options.minScore` is the lowest score to keep (default `0`).
 - `options.limit` is the maximum number of topics (default `2`).
 
-The score is the log-odds of "yes" over "no". At 0, the model gives "yes" and "no" equal odds. A positive score means that the model thinks the topic applies. The scores of different texts are comparable, which is not true for `classify`. The result is `[]` when no topic reaches `minScore`.
+For each judge, 0 is the cut, and a positive score means that the topic applies. The result is `[]` when no topic reaches `minScore`.
+
+With a chat judge, the score is the log-odds of "yes" over "no". At 0, the model gives "yes" and "no" equal odds. The scores of different texts are comparable, which is not true for `classify`. With `embedJudge`, the score is a difference of cosines. Do not compare it with the score of a chat judge.
 
 ### `logprobJudge(endpoint, options?)` and `jsonJudge(endpoint, options?)`
 
@@ -180,27 +200,71 @@ The score is the log-odds of "yes" over "no". At 0, the model gives "yes" and "n
 - `jsonJudge` asks for a probability for each topic in one request. Use it when the endpoint gives no logprobs, for example with a reasoning model.
 - `options.maxChars` is the number of characters of the text that the model reads (default `40000`). Use a smaller value for a model with a small context.
 
-`endpoint` is a `ChatEndpoint`:
+If a request fails, the function throws an error with the HTTP status. Some reasoning models sometimes send an empty reply. For this reason, `jsonJudge` asks again when a reply has no JSON object, up to `options.attempts` requests (default `3`).
+
+### `embedJudge(endpoint, options?)`
+
+`embedJudge` sends the text and the topics to the `/embeddings` path of the endpoint. It gets one vector for each input. The score of a topic is its cosine with the text, minus the mean cosine of all the topics, minus `options.cut`. Thus a topic gets a positive score when it is nearer to the text than the other topics, by more than `cut`.
+
+- Use one judge for all your posts. The judge keeps the vector of each topic, so each post after the first needs one request with one input.
+- Give it the full topic list. Each score compares a topic with the other topics. With only one topic, the score is always `-cut`. The test used 11 topics.
+- `options.maxChars` is the number of characters of the text that the model reads (default `2000`). In the test, the first 2,000 characters gave the same F1 as the full post or a higher one.
+- `options.cut` is the amount by which a cosine must be above the mean (default `0.04`). For EmbeddingGemma 2, the best value was 0.04 or 0.05 on each topic list of the test. Other models need a different value. For Qwen3-Embedding-0.6B, the best value was from 0.07 to 0.14.
+- `options.topicInput(topic)` and `options.textInput(text)` make the model inputs. The defaults are the EmbeddingGemma 2 formats, `task: search result | query: <tag>: <description>` and `title: none | text: <text>`. For another model, use the formats of that model. In the test, the `task: classification` format gave 0.07 to 0.15 less F1 at the best cut.
+
+If a request fails, `embedJudge` throws an error with the HTTP status. It also throws an error when the response does not have one usable vector for each input.
+
+### The endpoint
+
+`endpoint` is an `Endpoint`. All the judges and `describeTopics` use it. `ChatEndpoint` is the 3.4.0 name of the same type.
 
 - `baseURL`: the URL with the version path, for example `http://127.0.0.1:8080/v1`.
 - `model`: the model name.
-- `apiKey`: optional. Relatinator sends it as `Authorization: Bearer <apiKey>`.
+- `apiKey`: optional. Relatinator sends it as `Authorization: Bearer <apiKey>`. Use it for a hosted API.
 - `headers`: optional extra request headers.
-- `body`: optional extra fields for the request body.
+- `body`: optional extra fields for the request body, for example `{ dimensions: 256 }` for an embedding API.
 - `fetch`: optional replacement for the global `fetch`.
-
-If a request fails, the function throws an error with the HTTP status. Some reasoning models sometimes send an empty reply. For this reason, `jsonJudge` asks again when a reply has no JSON object, up to `options.attempts` requests (default `3`).
 
 ### `describeTopics(tags, posts, endpoint)`
 
-Writes one description for each tag from the titles and summaries of your posts. `posts` is an array of `{ title: string; summary?: string }`. Returns a promise of `Topic[]` in the order of `tags`. If the model gives no description for a tag, it throws an error that names the missing tags. Read and edit the descriptions before you use them.
+Writes one description for each tag from the titles and summaries of your posts. `posts` is an array of `{ title: string; summary?: string }`. Returns a promise of `Topic[]` in the order of `tags`. If the model gives no description for a tag, it throws an error that names the missing tags. Read and edit the descriptions before you use them. `describeTopics` needs a chat model, also when you use `embedJudge`.
 
 ### Choose a model
 
-- Use a model with about 2B parameters or more. In the test, models under 1B did no better than `classify`. Qwen3 4B Instruct (Q4_K_M, 2.5 GB) was the best local model. Gemma 4 E2B was the smallest model that came close to it.
-- With llama.cpp, add `body: { cache_prompt: true }`. The server then reads the post one time for all the questions about it. For Qwen3.5 models, also add `chat_template_kwargs: { enable_thinking: false }`, so that the first token is the answer.
-- Start with `minScore` at 0. The best threshold is different for each model. If you get too many topics, increase it. `pnpm --filter relatinator eval` shows the best threshold for labels that you approved.
-- The descriptions still matter most. Descriptions from `describeTopics` gave 0.10 to 0.14 more F1 than descriptions made from the tag names only.
+- For a chat judge, use a model with about 2B parameters or more. In the test, models under 1B did no better than `classify`. Qwen3 4B Instruct (Q4_K_M, 2.5 GB) was the best local model. Gemma 4 E2B was the smallest model that came close to it.
+- With llama.cpp, add `body: { cache_prompt: true }` to a chat endpoint. The server then reads the post one time for all the questions about it. For Qwen3.5 models, also add `chat_template_kwargs: { enable_thinking: false }`, so that the first token is the answer.
+- For `embedJudge`, use EmbeddingGemma 2. The Q4 file (176 MB) gave the same F1 as the Q8 and BF16 files.
+- Start with `minScore` at 0. If you get too many topics, increase it. `pnpm --filter relatinator eval` shows the best threshold for labels that you approved.
+- The descriptions still matter most. Descriptions from `describeTopics` gave 0.10 to 0.14 more F1 than descriptions made from the tag names only. For `embedJudge`, the difference was about 0.20.
+
+### Run EmbeddingGemma 2
+
+On your computer, use llama.cpp:
+
+1. Get a llama.cpp build that includes [pull request 30054](https://github.com/ggml-org/llama.cpp/pull/30054). An older build stops with `unknown model architecture: 'gemma-embedding2'`. The test used the `ghcr.io/ggml-org/llama.cpp:server-cuda` image, build 12098.
+2. Download `embeddinggemma-2-UD-Q4_K_XL.gguf` from [unsloth/embeddinggemma-2-GGUF](https://huggingface.co/unsloth/embeddinggemma-2-GGUF).
+3. Start the server:
+
+   ```sh
+   llama-server -m embeddinggemma-2-UD-Q4_K_XL.gguf --alias embeddinggemma-2 \
+     --embeddings --pooling mean -c 8192 -b 8192 -ub 8192 --port 8081
+   ```
+
+4. Use `{ baseURL: "http://127.0.0.1:8081/v1", model: "embeddinggemma-2" }` as the endpoint.
+
+The model is small enough for a CPU. On a CPU, the test embedded 300 texts in 25 seconds. Do not use the F16 file, because EmbeddingGemma 2 can give bad vectors in F16.
+
+With your own API key, use a hosted API. For example, DeepInfra serves the model as `google/embeddinggemma-2`:
+
+```ts
+const judge = embedJudge({
+  baseURL: "https://api.deepinfra.com/v1/openai",
+  model: "google/embeddinggemma-2",
+  apiKey: process.env.DEEPINFRA_API_KEY,
+});
+```
+
+No test used a hosted embedding API. `embedJudge` adds the EmbeddingGemma 2 prompts to the inputs itself. Do not set a prompt in the API as well, for example the `task` field of DeepInfra. For a different hosted model, set `topicInput`, `textInput`, and `cut` for that model.
 
 ## Best practices for topic lists
 
