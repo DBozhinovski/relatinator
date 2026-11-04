@@ -2,6 +2,16 @@
 
 All notable changes to the "relatinator" project will be documented in this file.
 
+## [3.5.0] - 2026-11-04
+
+This release adds `embedJudge()` to the experimental `relatinator/llm` entry point. It chooses topics with a small embedding model. The main entry point does not change.
+
+- **New:** `embedJudge(endpoint, { maxChars, cut, topicInput, textInput })` in `relatinator/llm` scores topics with an embedding model. It sends the text and the topics to the `/embeddings` path of an OpenAI-compatible endpoint, local or hosted. The score is the cosine of the text and the topic, minus the mean cosine of all the topics, minus `cut` (default `0.04`). The default inputs are the EmbeddingGemma 2 formats. The judge keeps the topic vectors, so each later text needs one request.
+- In a test with 37 posts, EmbeddingGemma 2 (176 MB) with `embedJudge` got an F1 of 0.83 and 0.81 with descriptions from `describeTopics`. Qwen3 4B with `logprobJudge` got 0.85 and 0.82, and `classify()` got 0.68 and 0.69.
+- **Changed:** The endpoint type is now `Endpoint`, because chat and embedding requests both use it. `ChatEndpoint` stays as a deprecated alias.
+- **Tooling:** `pnpm run eval` has a new option, `--judge embed`.
+- **Docs:** The README has new sections, "`embedJudge(endpoint, options?)`" and "Run EmbeddingGemma 2". `docs/architecture.md` has the results of the embedding judge.
+
 ## [3.4.0] - 2026-11-02
 
 This release adds `relatinator/llm`, an optional entry point that chooses topics with a language model. The main entry point does not change.
